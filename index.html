@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#7A1022">
+<title>Snapstrip</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,600;1,700;1,800&family=DM+Sans:wght@400;500;700&family=Special+Elite&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<!-- v0.6.1 tailwind, vintage beige / black dots / cherry burgundy -->
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          paper: '#F1EBDF', cream: '#FBF8F1', ink: '#1E1A18', burg: { DEFAULT: '#8E1430', dark: '#5E0B1E', light: '#A3132E' },
+          pink: { DEFAULT: '#C8102E', soft: '#EFE3CF', pale: '#F7F0E4', deep: '#A3132E' }, sky: { DEFAULT: '#1E1A18', soft: '#E6DCCB', deep: '#6E0E1F' },
+          muted: '#76675c', line: '#E2D8C6', stub: '#F3E7D3', brass: '#B8925A', dash: '#cdbfa9',
+        },
+        fontFamily: {
+          serif: ['"Playfair Display"', 'Georgia', 'serif'],
+          type: ['"Special Elite"', '"Courier New"', 'monospace'],
+          sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+          hand: ['Gaegu', 'cursive'],
+        },
+        boxShadow: { press: '0 4px 0 #5E0B1E', pressink: '0 4px 0 #000' },
+      },
+    },
+  };
+</script>
+<style type="text/tailwindcss">
+  @layer components {
+    .screen { @apply hidden pt-4 md:pt-6; animation: fade .4s ease; }
+    .screen.active { @apply flex; }
+    .ticket { @apply relative bg-pink-soft px-3 py-1.5 font-type text-[11px] tracking-wider text-burg sm:px-4 sm:text-xs; }
+    .ticket:nth-child(even) { @apply bg-sky-soft; }
+    .ticket.on { @apply bg-burg text-pink-pale; }
+    .btn { @apply relative inline-flex h-14 w-full items-center justify-center gap-2 rounded-full px-9 text-[15px] font-bold uppercase tracking-[.12em] transition active:translate-y-[3px] sm:w-auto; }
+    .btn::after { content: ""; @apply pointer-events-none absolute inset-[5px] rounded-full border border-dashed border-current opacity-50; }
+    .btn-main { @apply bg-burg text-pink-pale shadow-press active:shadow-none; }
+    .btn-ink { @apply bg-ink text-cream shadow-pressink active:shadow-none; }
+    .chip { @apply inline-flex items-center gap-2 rounded-full border-2 border-dashed border-dash bg-cream px-4 py-2 text-sm font-medium; }
+    .chip.on { @apply border-solid border-burg bg-burg text-pink-pale; }
+    .lay { @apply grid gap-[2px]; }
+    .lay i { @apply block h-[5px] w-[7px] rounded-[1px] bg-current opacity-75; }
+    .thumb { @apply relative aspect-[4/3] w-14 overflow-hidden rounded border-2 border-dashed border-dash bg-pink-pale sm:w-16; }
+    .thumb.filled { @apply cursor-pointer border-[3px] border-solid border-white shadow-md; }
+    .thumb img { @apply block h-full w-full object-cover; }
+    .fr { @apply flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-dash bg-cream px-1.5 pb-2 pt-2.5 text-[11px] font-medium leading-tight sm:text-xs; }
+    .fr canvas { @apply block h-24 w-auto max-w-full object-contain drop-shadow sm:h-28 lg:h-32; }
+    .fr.on { @apply border-solid border-burg bg-pink-pale text-burg ring-2 ring-inset ring-burg; }
+    .fl { @apply flex flex-col items-center gap-1.5 rounded-lg border-2 border-dashed border-dash bg-cream p-2 text-xs font-medium; }
+    .fl canvas { @apply block w-full rounded; }
+    .fl.on { @apply border-solid border-burg bg-pink-pale text-burg ring-2 ring-inset ring-burg; }
+    .panel-t { @apply hidden; }
+    .panel-t.on { @apply block; }
+  }
+</style>
+<style>
+  /* things utilities can't express: textures, lace, masks, keyframes */
+  /* touch + iPhone/iPad (mobile pass) */
+  html { -webkit-text-size-adjust: 100%; }
+  button, .btn, [data-go] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .app { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); padding-bottom: max(48px, env(safe-area-inset-bottom)); }
+  video { -webkit-user-select: none; user-select: none; }
+  img, canvas { max-width: 100%; }
+  /* black polka dots on beige paper */
+  body {
+    background-color: #F1EBDF;
+    background-image: radial-gradient(#1E1A18 10%, transparent 11.5%), radial-gradient(#1E1A18 10%, transparent 11.5%);
+    background-size: 38px 38px; background-position: 0 0, 19px 19px;
+  }
+  @media (min-width: 768px) { body { background-size: 50px 50px; background-position: 0 0, 25px 25px; } }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .35; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45  0 0 0 0 .38  0 0 0 0 .3  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .lace { border: 18px solid transparent; border-image: var(--lace) 30 fill / 18px round; filter: drop-shadow(0 10px 18px rgba(30,26,24,.22)); }
+  .lace.blue { border-image-source: var(--lace); }
+  .lace.white { border-image-source: var(--lace); }
+  @media (min-width: 768px) { .lace { border-width: 30px; border-image-width: 30px; } }
+  .ticket, .stub-mask {
+    -webkit-mask: radial-gradient(circle 6px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 6px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+            mask: radial-gradient(circle 6px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 6px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+  }
+  /* pink gingham ribbon */
+  .gingham { background-color: #fff; background-image: linear-gradient(90deg, rgba(163,19,46,.55) 50%, transparent 50%), linear-gradient(rgba(163,19,46,.55) 50%, transparent 50%); background-size: 14px 14px; }
+  .gingham.blue { background-image: linear-gradient(90deg, rgba(30,26,24,.6) 50%, transparent 50%), linear-gradient(rgba(30,26,24,.6) 50%, transparent 50%); }
+  /* scrapbook buttons, washi tape, hearts */
+  .sbtn { position: absolute; width: var(--s, 34px); height: var(--s, 34px); border-radius: 50%; transform: rotate(var(--r, 0deg));
+    background: radial-gradient(circle at 39% 39%, rgba(20,12,10,.6) 0 7%, transparent 8%), radial-gradient(circle at 61% 39%, rgba(20,12,10,.6) 0 7%, transparent 8%),
+      radial-gradient(circle at 39% 61%, rgba(20,12,10,.6) 0 7%, transparent 8%), radial-gradient(circle at 61% 61%, rgba(20,12,10,.6) 0 7%, transparent 8%),
+      radial-gradient(circle, transparent 0 55%, rgba(0,0,0,.12) 56% 61%, transparent 62%), var(--c, #F48FB1);
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.14), inset 0 2px 0 rgba(255,255,255,.45), 0 3px 6px rgba(94,11,30,.2); }
+  .tape { position: absolute; width: 92px; height: 26px; opacity: .92; transform: rotate(var(--r, -6deg));
+    background: repeating-linear-gradient(45deg, #C8102E 0 8px, #FBF8F1 8px 16px); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .tape.blue { background: repeating-linear-gradient(45deg, #1E1A18 0 8px, #FBF8F1 8px 16px); }
+  .tape::before, .tape::after { content: ""; position: absolute; top: 0; bottom: 0; width: 6px; background: radial-gradient(circle at 0 50%, transparent 3px, currentColor 3.5px) 0 0 / 6px 6px; color: transparent; }
+  .deco { position: absolute; pointer-events: none; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes floaty { 50% { transform: translateY(-6px) rotate(var(--r, 0deg)); } }
+  .floaty { animation: floaty 3.2s ease-in-out infinite; }
+  .bulbs::before { content: ""; position: absolute; inset: 6px; border-radius: 6px;
+    background: radial-gradient(circle, #FFE7A8 35%, #E2B85F 50%, transparent 56%) 0 0 / 16px 16px;
+    -webkit-mask: linear-gradient(#000 0 0) top / 100% 16px no-repeat, linear-gradient(#000 0 0) bottom / 100% 16px no-repeat;
+            mask: linear-gradient(#000 0 0) top / 100% 16px no-repeat, linear-gradient(#000 0 0) bottom / 100% 16px no-repeat;
+    animation: bulbs 1.2s steps(2) infinite; }
+  @keyframes bulbs { 50% { filter: brightness(.6); } }
+  .curtain { background: repeating-linear-gradient(90deg, #6d1121 0 26px, #85162a 26px 40px, #5a0c19 40px 52px); }
+  .flash.go { animation: flash .4s ease-out; }
+  @keyframes flash { 0% { opacity: .95; } 100% { opacity: 0; } }
+  .thumb.filled:hover::after { content: "retake"; position: absolute; inset: 0; background: rgba(142,20,48,.8); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .shutter { background: radial-gradient(circle at 35% 30%, #d0344f, #A3132E 50%, #5E0B1E); box-shadow: 0 0 0 6px #FBF8F1, 0 0 0 8px #1E1A18, 0 8px 18px rgba(0,0,0,.3); }
+  .shutter:disabled { opacity: .55; cursor: default; }
+  .preview canvas { width: min(62vw, 230px); }
+  .preview.wide canvas { width: min(84vw, 340px); }
+  /* result: photobooth delivery slot */
+  .machine { width: var(--mw, 300px); max-width: 100%; }
+  .plate { background: linear-gradient(180deg, #A3132E, #8E1430 40%, #6a0e22); box-shadow: inset 0 0 0 4px rgba(243,231,211,.35), inset 0 2px 0 rgba(255,255,255,.18), 0 10px 20px rgba(94,11,30,.25); }
+  .slot { width: min(calc(var(--sw, 200px) + 26px), 100%); box-shadow: inset 0 3px 5px #000, 0 1px 0 rgba(255,255,255,.2); }
+  .chute canvas { width: var(--sw, 200px); max-width: 100%; transform: translateY(-102%); filter: drop-shadow(0 10px 14px rgba(94,11,30,.25)); }
+  .machine.busy .lamp { background: #FFD27A; box-shadow: 0 0 10px #FFC04D; animation: blink .5s steps(2) infinite; }
+  @keyframes blink { 50% { background: #a87a2c; box-shadow: none; } }
+  .machine.shake { animation: shake .09s linear infinite; }
+  @keyframes shake { 0% { transform: translate(0, 0); } 25% { transform: translate(-1px, 1px); } 50% { transform: translate(1px, 0); } 75% { transform: translate(0, -1px); } }
+  .result-actions, .tg-card { transition: opacity .5s; }
+  #result.printing .result-actions, #result.printing .tg-card { opacity: 0; pointer-events: none; }
+  .tg-card { width: 100% !important; max-width: 420px; }
+  @media (max-width: 420px) { .tg-card { flex-direction: column; text-align: center; } }
+</style>
+</head>
+<body class="min-h-screen font-sans text-ink antialiased">
+<svg width="0" height="0" class="absolute" aria-hidden="true">
+  <symbol id="heart" viewBox="0 0 32 30"><path d="M16 28C-5 15 1-3 16 7c15-10 21 8 0 21z"/></symbol>
+  <symbol id="bow" viewBox="0 0 120 74"><!-- slim satin ribbon --><g fill="none" stroke="#7A1022" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M60 31C50 17 30 9 21 13c-8 4-3 14 9 17 10 2 22 2 30 1z" fill="#A3132E" fill-opacity=".12"/><path d="M60 31c10-14 30-22 39-18 8 4 3 14-9 17-10 2-22 2-30 1z" fill="#A3132E" fill-opacity=".12"/><path d="M30 18c9 3 20 8 28 12M90 18c-9 3-20 8-28 12" stroke-width=".9" opacity=".55"/><path d="M57 34c-4 11-12 24-22 34l5-.5 1.5 4.5C49 61 55 47 59 35"/><path d="M63 34c4 11 12 24 22 34l-5-.5-1.5 4.5C71 61 65 47 61 35"/></g><rect x="56.5" y="27" width="7" height="9" rx="2" fill="#7A1022"/></symbol>
+</svg>
+<div class="app relative z-[1] mx-auto max-w-6xl px-2 pb-12 pt-5 sm:px-4 md:px-7 md:pb-20 md:pt-14">
+  <div class="lace relative"><div class="relative px-3 pb-8 pt-3 sm:px-6 md:px-12 md:pb-10 md:pt-6">
+
+    <header class="relative pb-4 text-center md:pb-6">
+      <svg class="mx-auto -mb-1 h-10 w-16 md:h-12 md:w-20" aria-hidden="true"><use href="#bow"/></svg>
+      <div class="font-type text-[11px] uppercase tracking-[.35em] text-pink-deep">♥ est. 2026 ♥</div>
+      <div class="cursor-pointer font-serif text-[44px] font-extrabold italic leading-tight tracking-tight text-burg [text-shadow:3px_3px_0_#E3D3B8] sm:text-5xl md:text-6xl" data-go="landing">Snapstrip</div>
+      <div class="font-hand text-lg leading-none text-sky-deep md:text-xl">photo booth &amp; keepsake strips, made with love</div>
+      <div class="gingham mx-auto mt-4 h-3 max-w-md rounded-full md:mt-5"></div>
+      <div class="mt-4 flex flex-wrap justify-center gap-1.5 sm:gap-2.5 md:mt-5" aria-hidden="true">
+        <span class="ticket">01 · hello</span><span class="ticket">02 · pose</span><span class="ticket">03 · style</span><span class="ticket">04 · print</span>
+      </div>
+      <span class="sbtn left-0 top-1 hidden sm:block" style="--c:#A3132E;--s:30px;--r:-12deg"></span>
+      <span class="sbtn right-1 top-3 hidden sm:block" style="--c:#1E1A18;--s:26px;--r:20deg"></span>
+      <svg class="deco floaty left-8 top-12 hidden h-5 w-5 fill-pink sm:block" style="--r:-12deg" aria-hidden="true"><use href="#heart"/></svg>
+      <svg class="deco floaty right-10 top-14 hidden h-4 w-4 fill-sky sm:block" style="--r:14deg" aria-hidden="true"><use href="#heart"/></svg>
+    </header>
+
+    <!-- 1. Landing -->
+    <section class="screen active flex-col items-center gap-10 pt-6 text-center md:flex-row md:gap-16 md:px-3 md:pt-10 md:text-left" id="landing">
+      <div class="flex-1">
+        <div class="mb-4 inline-block -rotate-2 rounded-full bg-sky-soft px-4 py-1 font-type text-xs uppercase tracking-[.2em] text-burg">the little booth on the corner</div>
+        <h1 class="mb-5 font-serif text-[44px] font-black leading-[.98] tracking-tight sm:text-6xl lg:text-7xl">Draw the curtain,<br><em class="font-bold text-burg">darling</em> <svg class="inline h-9 w-9 -translate-y-1 fill-pink-deep md:h-12 md:w-12" aria-hidden="true"><use href="#heart"/></svg></h1>
+        <p class="mx-auto mb-8 max-w-md text-base leading-relaxed text-muted md:mx-0 md:mb-10 md:text-lg">Step in, strike your poses and walk away with a real photobooth strip, framed in lace, gingham, buttons, polka dots or doodles. Photos stay on your device.</p>
+        <div class="flex flex-col items-center gap-4 sm:flex-row sm:justify-center md:justify-start">
+          <button class="btn btn-main" id="startBtn">Step inside ♥</button>
+          <button class="font-hand text-xl text-sky-deep underline decoration-wavy underline-offset-4" id="uploadLink">or use my photos</button>
+          <input type="file" id="fileInput" accept="image/*" multiple hidden>
+        </div>
+        <div class="mt-9 flex justify-center gap-3 font-type text-xs text-muted md:mt-11 md:justify-start md:text-sm">
+          <div class="rounded-xl bg-pink-pale px-4 py-2"><b class="block font-serif text-3xl font-black text-burg">4</b>layouts</div>
+          <div class="rounded-xl bg-sky-soft/70 px-4 py-2"><b class="block font-serif text-3xl font-black text-burg">24</b>frames</div>
+          <div class="rounded-xl bg-pink-pale px-4 py-2"><b class="block font-serif text-3xl font-black text-burg">3s</b>per pose</div>
+        </div>
+      </div>
+      <div class="relative flex shrink-0 flex-col items-center px-6">
+        <div class="bulbs relative rounded-[14px] bg-burg px-7 font-serif text-[28px] font-black tracking-[.3em] text-pink-pale shadow-[inset_0_0_0_4px_#540A17,0_8px_16px_rgba(0,0,0,.2)] md:px-8 md:text-[34px]"><span class="relative block py-6">PHOTOS</span></div>
+        <svg class="absolute -top-6 left-1/2 h-12 w-20 -translate-x-1/2" aria-hidden="true"><use href="#bow"/></svg>
+        <div class="mt-4 h-4 w-56 rounded-lg bg-[#2a2321] shadow-[inset_0_3px_4px_#000] md:w-64"></div>
+        <div class="relative -mt-2">
+          <canvas id="sampleStrip" class="block w-44 origin-top rotate-[2.5deg] drop-shadow-xl md:w-48"></canvas>
+          <span class="tape -left-6 bottom-10" style="--r:-28deg"></span>
+          <span class="tape blue -right-8 top-24" style="--r:24deg"></span>
+        </div>
+        <span class="sbtn -left-1 top-36" style="--c:#A3132E;--s:38px;--r:10deg"></span>
+        <span class="sbtn -left-3 top-48" style="--c:#E9DCC6;--s:28px"></span>
+        <span class="sbtn -right-2 bottom-24" style="--c:#1E1A18;--s:32px;--r:-18deg"></span>
+        <span class="sbtn right-0 bottom-12" style="--c:#C8102E;--s:24px"></span>
+        <svg class="deco floaty -right-3 top-40 h-7 w-7 fill-pink-deep" style="--r:12deg" aria-hidden="true"><use href="#heart"/></svg>
+        <svg class="deco floaty -left-2 bottom-28 h-5 w-5 fill-sky-deep" style="--r:-10deg" aria-hidden="true"><use href="#heart"/></svg>
+        <div class="deco -right-4 bottom-2 rotate-[-8deg] font-hand text-2xl text-pink-deep">xoxo</div>
+      </div>
+    </section>
+
+    <!-- 2. Booth -->
+    <section class="screen flex-col items-center gap-5 md:gap-7" id="booth">
+      <div class="flex flex-wrap justify-center gap-2" id="layoutChips"></div>
+      <div class="lace blue relative w-full max-w-[620px]">
+        <div class="relative aspect-[4/3] w-full overflow-hidden bg-[#2a2321]">
+          <video id="video" class="h-full w-full -scale-x-100 object-cover" autoplay playsinline muted></video>
+          <div class="curtain absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center font-type text-sm text-white" id="fake"><div class="font-serif text-2xl italic text-white [text-shadow:0_2px_0_#8E1430] md:text-4xl">the curtain is drawn ♥</div><div>no camera? we'll use cute sample photos</div></div>
+          <div class="absolute left-3 top-3 font-type text-xs tracking-[.2em] text-[#FFF6F8] [text-shadow:0_1px_4px_#000]" id="poseLabel"></div>
+          <div class="pointer-events-none absolute inset-0 flex items-center justify-center font-serif text-[110px] font-black text-[#FFF6F8] [text-shadow:0_6px_0_#7A1022,0_10px_24px_rgba(0,0,0,.35)] md:text-[160px]" id="countdown"></div>
+          <div class="flash pointer-events-none absolute inset-0 bg-white opacity-0" id="flash"></div>
+        </div>
+        <svg class="absolute -top-8 left-1/2 h-12 w-20 -translate-x-1/2 md:-top-11 md:h-14 md:w-24" aria-hidden="true"><use href="#bow"/></svg>
+      </div>
+      <div class="flex flex-wrap justify-center gap-2 sm:gap-2.5" id="thumbs"></div>
+      <button class="shutter relative h-20 w-20 rounded-full font-type text-xs tracking-[.2em] text-white md:h-[84px] md:w-[84px]" id="shutter" aria-label="Take photos">PUSH</button>
+      <div class="text-center font-hand text-lg text-muted" id="boothHint">press the button · poses are 3 seconds apart</div>
+    </section>
+
+    <!-- 3. Style -->
+    <section class="screen flex-col items-center gap-8 md:flex-row md:items-start md:justify-center md:gap-14" id="style">
+      <div class="preview flex shrink-0 justify-center md:sticky md:top-5" id="previewWrap"><canvas id="stylePreview" class="block drop-shadow-xl"></canvas></div>
+      <div class="w-full md:max-w-lg md:flex-1">
+        <div class="mb-6 flex flex-wrap justify-center gap-2 md:justify-start">
+          <button class="chip on" data-tab="frame">♥ Frame</button>
+          <button class="chip" data-tab="filter">Film look</button>
+          <button class="chip" data-tab="text">Caption</button>
+        </div>
+        <div class="panel-t on" id="panel-frame"><h3 class="mb-1 font-serif text-2xl font-bold italic text-burg">Choose your frame</h3><p class="mb-4 font-hand text-lg leading-none text-sky-deep">lace, gingham, buttons, polka, film &amp; doodles</p><div class="mb-8 grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-4" id="frames"></div></div>
+        <div class="panel-t" id="panel-filter"><h3 class="mb-4 font-serif text-2xl font-bold italic text-burg">Pick a film look</h3><div class="mb-8 grid grid-cols-3 gap-2 sm:gap-4" id="filters"></div></div>
+        <div class="panel-t" id="panel-text"><h3 class="mb-4 font-serif text-2xl font-bold italic text-burg">Write on the strip</h3>
+          <input class="mb-3.5 h-13 w-full rounded-xl border-2 border-dashed border-dash bg-cream px-3.5 py-3.5 text-base outline-none focus:border-solid focus:border-burg" id="captionInput" maxlength="34" placeholder="e.g. besties forever ♥">
+          <label class="mb-6 flex items-center gap-2 text-[15px]"><input type="checkbox" id="dateToggle" class="h-[18px] w-[18px] accent-burg" checked> Stamp today's date</label>
+        </div>
+        <div class="sticky bottom-3 z-10 md:static"><button class="btn btn-main sm:w-full" id="doneBtn">Print my strip ♥</button></div>
+      </div>
+    </section>
+
+    <!-- 4. Result -->
+    <section class="screen flex-col items-center gap-7" id="result">
+      <div class="min-h-[40px] text-center font-serif text-2xl font-bold italic text-burg md:text-3xl" id="printStatus">printing…</div>
+      <div class="machine relative" id="machine">
+        <svg class="absolute -top-7 left-1/2 z-[3] h-12 w-20 -translate-x-1/2" aria-hidden="true"><use href="#bow"/></svg>
+        <div class="plate relative z-[2] rounded-b-md rounded-t-[18px] px-5 pb-7 pt-5 text-center">
+          <span class="lamp absolute left-5 top-[20px] h-3 w-3 rounded-full bg-[#3a2c1c]"></span><span class="lamp absolute right-5 top-[20px] h-3 w-3 rounded-full bg-[#3a2c1c]"></span>
+          <span class="inline-block rounded-full border-2 border-brass bg-black/15 px-5 py-1.5 font-serif text-base font-black tracking-[.3em] text-pink-pale md:text-lg">PHOTOS</span>
+          <span class="mt-1.5 block font-type text-[9px] tracking-[.25em] text-pink-soft md:text-[10px]">PLEASE WAIT · COLLECT BELOW</span>
+          <div class="slot absolute bottom-2.5 left-1/2 h-3 -translate-x-1/2 rounded-md bg-[#120d0c]"></div>
+        </div>
+        <div class="chute relative z-[1] -mt-4 flex justify-center overflow-hidden px-5 pb-6"><canvas id="finalStrip" class="block cursor-pointer" title="Tap to shake it"></canvas></div>
+      </div>
+      <div class="result-actions flex w-full max-w-[340px] flex-col gap-4">
+        <button class="btn btn-main sm:w-full" id="downloadBtn">Download PNG</button>
+        <button class="btn btn-ink sm:w-full" id="againBtn">Take another</button>
+      </div>
+    </section>
+
+    <footer class="pt-12 text-center"><div class="gingham blue mx-auto mb-3 h-2 max-w-xs rounded-full"></div><span class="font-type text-xs tracking-wide text-muted">♥ clickable mock · v0.6 ♥</span></footer>
+  </div></div>
+</div>
+<div class="toast pointer-events-none fixed bottom-7 left-1/2 z-10 -translate-x-1/2 rounded-full bg-burg px-5 py-3 font-type text-sm text-pink-pale opacity-0 transition-opacity [&.show]:opacity-100" id="toast"></div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const order = ['landing', 'booth', 'style', 'result'];
+  const TAU = Math.PI * 2;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  // ================= white crochet lace (CSS border-image) =================
+  [['--lace', '#fffdf8', '#ddd5c6', '#fffdf8'], ['--lace-pink', '#FFD3E1', '#EE9DB8', '#FFFBF7'], ['--lace-blue', '#D3E5FB', '#97BDE8', '#FFFBF7']].forEach(function makeLace([name, w, hole, mid]) {
+    let s = `<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><rect x='7' y='7' width='76' height='76' fill='${w}'/>`;
+    for (let c = 7.5; c < 90; c += 15) {
+      for (const [x, y] of [[c, 7.5], [c, 82.5], [7.5, c], [82.5, c]]) s += `<circle cx='${x}' cy='${y}' r='7.5' fill='${w}'/>`;
+    }
+    for (let c = 7.5; c < 90; c += 15) {
+      for (const [x, y] of [[c, 7], [c, 83], [7, c], [83, c]]) s += `<circle cx='${x}' cy='${y}' r='2.6' fill='${hole}'/>`;
+    }
+    for (let c = 4; c < 90; c += 7.5) {
+      for (const [x, y] of [[c, 16.5], [c, 73.5], [16.5, c], [73.5, c]]) if (c < 16 || c > 74 || true) s += `<circle cx='${x}' cy='${y}' r='1.7' fill='${hole}'/>`;
+      for (const [x, y] of [[c + 3.7, 22], [c + 3.7, 68], [22, c + 3.7], [68, c + 3.7]]) s += `<circle cx='${x}' cy='${y}' r='1.3' fill='${hole}'/>`;
+    }
+    s += `<rect x='27.5' y='27.5' width='35' height='35' fill='${mid}'/>`;
+    s += `<rect x='27.5' y='27.5' width='35' height='35' fill='none' stroke='#e6dfd2' stroke-width='1' stroke-dasharray='2 2'/>`;
+    s += `</svg>`;
+    document.documentElement.style.setProperty(name, `url("data:image/svg+xml,${encodeURIComponent(s)}")`);
+  });
+
+  // ================= canvas helpers =================
+  const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const loadImg = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+  function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  function polka(c, x, y, w, h, bg, dot, r, sp) {
+    c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+    c.fillStyle = bg; c.fillRect(x, y, w, h); c.fillStyle = dot;
+    for (let j = 0, row = 0; j < h + sp; j += sp / 2, row++) for (let i = (row % 2) * sp / 2; i < w + sp; i += sp) { c.beginPath(); c.arc(x + i, y + j, r, 0, TAU); c.fill(); }
+    c.restore();
+  }
+  function stripes(c, W, H, a, b, sw) { c.fillStyle = a; c.fillRect(0, 0, W, H); c.fillStyle = b; for (let x = 0; x < W; x += sw * 2) c.fillRect(x, 0, sw, H); }
+  function gingham(c, x, y, w, h, base, stripe, s) {
+    c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip(); c.fillStyle = base; c.fillRect(x, y, w, h); c.fillStyle = stripe;
+    for (let i = 0; i < w / s + 2; i += 2) c.fillRect(x + i * s, y, s, h);
+    for (let j = 0; j < h / s + 2; j += 2) c.fillRect(x, y + j * s, w, s);
+    c.restore();
+  }
+  function grain(c, W, H, a, seed) { const R = rng(seed); c.save(); for (let i = 0; i < W * H / 260; i++) { c.fillStyle = R() > .5 ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`; c.fillRect(R() * W, R() * H, 1.6, 1.6); } c.restore(); }
+  function ticketPath(c, x, y, w, h, r) {
+    c.beginPath(); c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.arc(x + w, y, r, Math.PI, Math.PI / 2, true);
+    c.lineTo(x + w, y + h - r); c.arc(x + w, y + h, r, Math.PI * 1.5, Math.PI, true);
+    c.lineTo(x + r, y + h); c.arc(x, y + h, r, 0, -Math.PI / 2, true);
+    c.lineTo(x, y + r); c.arc(x, y, r, Math.PI / 2, 0, true); c.closePath();
+  }
+  function heartPath(c, cx, cy, s) { c.beginPath(); c.moveTo(cx, cy + s * .9); c.bezierCurveTo(cx - s * 1.6, cy - s * .1, cx - s * .75, cy - s * 1.25, cx, cy - s * .45); c.bezierCurveTo(cx + s * .75, cy - s * 1.25, cx + s * 1.6, cy - s * .1, cx, cy + s * .9); c.closePath(); }
+  function wrapLines(c, text, maxW) { const words = text.split(/\s+/); const lines = []; let cur = ''; for (const w of words) { const t = cur ? cur + ' ' + w : w; if (c.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; } if (cur) lines.push(cur); return lines; }
+
+  // ---- doodles (hand-drawn look) ----
+  const HAND = '700 54px Gaegu, "Comic Sans MS", cursive';
+  function sticker(c, draw) { c.save(); c.shadowColor = 'rgba(0,0,0,.12)'; c.shadowBlur = 6; c.shadowOffsetY = 2; c.strokeStyle = '#fff'; c.fillStyle = '#fff'; c.lineWidth = 16; c.lineJoin = 'round'; c.lineCap = 'round'; draw(true); c.restore(); c.save(); c.lineJoin = 'round'; c.lineCap = 'round'; c.strokeStyle = '#1e1a18'; c.lineWidth = 4; draw(false); c.restore(); }
+  function starPts(c, x, y, r, R, n = 5, inner = .48) { c.beginPath(); for (let i = 0; i < n * 2; i++) { const a = -Math.PI / 2 + i * Math.PI / n, rad = (i % 2 ? r * inner : r) * (1 + (R() - .5) * .14); c.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); } c.closePath(); }
+  function doodleStar(c, x, y, r, fill, seed, tail) {
+    sticker(c, s => { const R = rng(seed); starPts(c, x, y, r, R); if (s) { c.stroke(); c.fill(); } else { c.fillStyle = fill; c.fill(); c.stroke(); }
+      if (tail) { c.beginPath(); c.moveTo(x + r * .8, y + r * .3); c.bezierCurveTo(x + r * 1.8, y + r * .9, x + r * 2.6, y - r * .2, x + r * 2, y - r * .5); c.bezierCurveTo(x + r * 1.6, y - r * .7, x + r * 1.5, y - r * .1, x + r * 1.9, y - r * .05); c.stroke(); } });
+  }
+  function sparkle(c, x, y, r, fill) {
+    sticker(c, s => { c.beginPath(); for (let i = 0; i < 8; i++) { const a = -Math.PI / 2 + i * Math.PI / 4, rad = i % 2 ? r * .22 : (i % 4 ? r * .7 : r); c.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); } c.closePath(); if (s) { c.stroke(); c.fill(); } else { c.fillStyle = fill; c.fill(); c.stroke(); } });
+  }
+  function numTag(c, x, y, text) {
+    c.save(); c.fillStyle = '#fff'; c.strokeStyle = '#1e1a18'; c.lineWidth = 3.5; c.beginPath(); c.rect(x, y, 78, 50); c.fill(); c.stroke();
+    c.fillStyle = '#1e1a18'; c.font = '700 40px Gaegu, cursive'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, x + 39, y + 27); c.restore();
+  }
+  function heartTag(c, x, y, s, fill, text) {
+    sticker(c, st => { heartPath(c, x, y, s); if (st) { c.stroke(); c.fill(); } else { c.fillStyle = fill; c.fill(); c.stroke(); } });
+    c.save(); c.fillStyle = '#1e1a18'; c.font = `700 ${s * .8}px Gaegu, cursive`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, x, y + s * .12); c.restore();
+  }
+  function notes(c, x, y, s, fill) {
+    sticker(c, st => {
+      c.beginPath(); c.ellipse(x, y + s * 1.2, s * .32, s * .24, -.4, 0, TAU); c.ellipse(x + s * .9, y + s * 1.0, s * .32, s * .24, -.4, 0, TAU);
+      if (st) { c.stroke(); c.fill(); } else { c.fillStyle = fill; c.fill(); c.stroke(); }
+      c.beginPath(); c.moveTo(x + s * .28, y + s * 1.1); c.lineTo(x + s * .28, y); c.lineTo(x + s * 1.18, y - s * .2); c.lineTo(x + s * 1.18, y + s * .9); c.stroke();
+      c.beginPath(); c.moveTo(x + s * .28, y + s * .22); c.lineTo(x + s * 1.18, y + s * .02); c.stroke();
+    });
+  }
+  function carousel(c, cx, cy, s, fill) {
+    const P = (x, y) => [cx + x * s, cy + y * s];
+    sticker(c, st => {
+      const shape = () => {
+        c.beginPath(); c.moveTo(...P(-140, -40)); c.quadraticCurveTo(...P(-60, -112), ...P(0, -136)); c.quadraticCurveTo(...P(60, -112), ...P(140, -40)); c.lineTo(...P(140, -12));
+        for (let k = 5; k >= 0; k--) { const [ax, ay] = P(-140 + 46.67 * (k + .5), -12); c.arc(ax, ay, 23.3 * s, 0, Math.PI, false); }
+        c.closePath();
+      };
+      if (st) {
+        rr(c, cx - 156 * s, cy - 180 * s, 312 * s, 330 * s, 60 * s); c.fill();
+        return;
+      }
+      c.beginPath(); c.ellipse(...P(0, 122), 150 * s, 24 * s, 0, 0, TAU); c.fillStyle = fill; c.fill(); c.stroke();
+      c.beginPath(); c.ellipse(...P(0, 106), 150 * s, 24 * s, 0, 0, TAU); c.fillStyle = fill; c.fill(); c.stroke();
+      c.lineWidth = 3;
+      for (const px of [-95, 0, 95]) { c.beginPath(); c.moveTo(...P(px, -10)); c.lineTo(...P(px, 106)); c.stroke(); }
+      for (const [hx, hy] of [[-95, 46], [0, 60], [95, 46]]) {
+        c.beginPath(); c.ellipse(...P(hx, hy), 30 * s, 13 * s, 0, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.stroke();
+        c.beginPath(); c.ellipse(...P(hx + 30, hy - 14), 10 * s, 15 * s, .5, 0, TAU); c.fill(); c.stroke();
+        c.beginPath(); c.moveTo(...P(hx - 18, hy + 10)); c.lineTo(...P(hx - 24, hy + 30)); c.moveTo(...P(hx + 16, hy + 10)); c.lineTo(...P(hx + 22, hy + 30)); c.moveTo(...P(hx - 30, hy - 2)); c.quadraticCurveTo(...P(hx - 44, hy + 2), ...P(hx - 46, hy + 16)); c.stroke();
+      }
+      c.lineWidth = 4;
+      shape(); c.fillStyle = fill; c.fill(); c.stroke();
+      c.lineWidth = 3;
+      for (const rx of [-90, -40, 40, 90]) { c.beginPath(); c.moveTo(...P(0, -134)); c.quadraticCurveTo(...P(rx * .6, -90), ...P(rx, -40)); c.stroke(); }
+      c.beginPath(); c.moveTo(...P(-140, -40)); c.lineTo(...P(140, -40)); c.stroke();
+      for (let k = 0; k < 5; k++) { const [fx, fy] = P(-112 + k * 56, -26); for (let p = 0; p < 5; p++) { const a = p * TAU / 5; c.beginPath(); c.arc(fx + Math.cos(a) * 6 * s, fy + Math.sin(a) * 6 * s, 4.5 * s, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.stroke(); } }
+      c.beginPath(); c.moveTo(...P(0, -136)); c.lineTo(...P(0, -152)); c.stroke();
+      heartPath(c, ...P(0, -162), 11 * s); c.fillStyle = fill; c.fill(); c.stroke();
+    });
+  }
+  function cherries(c, cx, cy, s) {
+    sticker(c, st => {
+      const balls = [[-34, 40], [30, 52]];
+      if (st) { for (const [bx, by] of balls) { c.beginPath(); c.arc(cx + bx * s, cy + by * s, 30 * s, 0, TAU); c.fill(); c.stroke(); } c.beginPath(); c.moveTo(cx - 30 * s, cy + 14 * s); c.quadraticCurveTo(cx - 10 * s, cy - 40 * s, cx + 10 * s, cy - 60 * s); c.quadraticCurveTo(cx + 20 * s, cy - 20 * s, cx + 30 * s, cy + 24 * s); c.stroke(); return; }
+      c.beginPath(); c.moveTo(cx - 32 * s, cy + 12 * s); c.quadraticCurveTo(cx - 12 * s, cy - 40 * s, cx + 10 * s, cy - 60 * s); c.moveTo(cx + 28 * s, cy + 24 * s); c.quadraticCurveTo(cx + 20 * s, cy - 20 * s, cx + 10 * s, cy - 60 * s); c.stroke();
+      c.beginPath(); c.ellipse(cx + 34 * s, cy - 58 * s, 26 * s, 11 * s, -.4, 0, TAU); c.fillStyle = '#7d9a5a'; c.fill(); c.stroke();
+      for (const [bx, by] of balls) { c.beginPath(); c.arc(cx + bx * s, cy + by * s, 28 * s, 0, TAU); c.fillStyle = '#8E1A2C'; c.fill(); c.stroke(); c.beginPath(); c.arc(cx + (bx - 9) * s, cy + (by - 9) * s, 8 * s, Math.PI * 1.1, Math.PI * 1.7); c.strokeStyle = '#fff'; c.stroke(); c.strokeStyle = '#1e1a18'; }
+    });
+  }
+  function photoPlace(c, x, y) { c.save(); c.fillStyle = '#1e1a18'; c.font = '900 30px "Playfair Display", Georgia, serif'; c.textAlign = 'right'; c.textBaseline = 'alphabetic'; c.fillText('PHOTO', x, y); c.fillText('BOOTH', x, y + 30); c.restore(); }
+  function handText(c, text, x, y, maxW, size, color, outline) {
+    c.save(); c.font = `700 ${size}px Gaegu, "Comic Sans MS", cursive`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    const lines = wrapLines(c, text, maxW).slice(0, 4), lh = size * 1.02, y0 = y - (lines.length - 1) * lh / 2;
+    lines.forEach((l, i) => { if (outline) { c.strokeStyle = outline; c.lineWidth = 12; c.lineJoin = 'round'; c.strokeText(l, x, y0 + i * lh); } c.fillStyle = color; c.fillText(l, x, y0 + i * lh); });
+    c.restore();
+  }
+  function stub(c, x, y, w, h, rot) {
+    c.save(); c.translate(x + w / 2, y + h / 2); c.rotate(rot); c.translate(-w / 2, -h / 2);
+    c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 10; c.shadowOffsetY = 4;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(w, 0); c.lineTo(w, h / 2 - 12); c.arc(w, h / 2, 12, -Math.PI / 2, Math.PI / 2, true); c.lineTo(w, h); c.lineTo(0, h); c.lineTo(0, h / 2 + 12); c.arc(0, h / 2, 12, Math.PI / 2, -Math.PI / 2, true); c.closePath();
+    c.fillStyle = '#F1E4CC'; c.fill(); c.shadowColor = 'transparent';
+    c.strokeStyle = '#B3261E'; c.lineWidth = 2; c.setLineDash([5, 5]); c.beginPath(); c.moveTo(34, 8); c.lineTo(34, h - 8); c.moveTo(w - 34, 8); c.lineTo(w - 34, h - 8); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#B3261E'; c.font = '17px "Special Elite", monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (const sx of [17, w - 17]) { c.save(); c.translate(sx, h / 2); c.rotate(-Math.PI / 2); c.fillText('48645235', 0, 0); c.restore(); }
+    c.fillStyle = '#1e1a18'; c.font = '700 26px "DM Sans", sans-serif'; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    ['good', 'things', 'are', 'coming'].forEach((t, i) => c.fillText(t, 48, 34 + i * 26));
+    c.restore();
+  }
+  function crochetRing(c, x, y, w, h, band) {
+    const ox = x - band, oy = y - band, ow = w + band * 2, oh = h + band * 2;
+    c.save(); c.shadowColor = 'rgba(0,0,0,.22)'; c.shadowBlur = 12; c.shadowOffsetY = 4; c.fillStyle = '#fffdf8';
+    c.beginPath(); c.rect(ox, oy, ow, oh);
+    const sc = 14;
+    for (let t = ox + sc; t < ox + ow; t += sc * 2) { c.moveTo(t + sc, oy); c.arc(t, oy, sc, 0, TAU); c.moveTo(t + sc, oy + oh); c.arc(t, oy + oh, sc, 0, TAU); }
+    for (let t = oy + sc; t < oy + oh; t += sc * 2) { c.moveTo(ox + sc, t); c.arc(ox, t, sc, 0, TAU); c.moveTo(ox + ow + sc, t); c.arc(ox + ow, t, sc, 0, TAU); }
+    c.fill('nonzero'); c.restore();
+    c.save(); c.fillStyle = '#c3b8a5';
+    for (let t = ox + sc; t < ox + ow; t += sc * 2) { for (const yy of [oy - 3, oy + oh + 3]) { c.beginPath(); c.arc(t, yy, 4.2, 0, TAU); c.fill(); } }
+    for (let t = oy + sc; t < oy + oh; t += sc * 2) { for (const xx of [ox - 3, ox + ow + 3]) { c.beginPath(); c.arc(xx, t, 4.2, 0, TAU); c.fill(); } }
+    const st = 8;
+    for (let yy = oy + 10; yy < oy + oh - 6; yy += st) for (let xx = ox + 10 + ((yy / st | 0) % 2) * st / 2; xx < ox + ow - 6; xx += st) {
+      if (xx > x - 8 && xx < x + w + 8 && yy > y - 8 && yy < y + h + 8) continue;
+      const edge = Math.min(Math.abs(xx - ox), Math.abs(xx - ox - ow), Math.abs(yy - oy), Math.abs(yy - oy - oh));
+      c.beginPath(); c.arc(xx, yy, edge > band * .6 ? 1.9 : (edge > band * .3 ? 2.8 : 2.2), 0, TAU); c.fill();
+    }
+    c.strokeStyle = '#e4ddcf'; c.lineWidth = 3; c.setLineDash([6, 5]); c.strokeRect(x - 8, y - 8, w + 16, h + 16); c.setLineDash([]);
+    c.restore();
+  }
+
+  // ================= layouts + frames =================
+  const LAYOUTS = {
+    '4x1': { cols: 1, rows: 4, label: 'Strip · 4' },
+    '3x1': { cols: 1, rows: 3, label: 'Strip · 3' },
+    '2x2': { cols: 2, rows: 2, label: 'Grid 2×2' },
+    '2x4': { cols: 2, rows: 4, label: 'Grid 2×4' },
+  };
+  const PW = 600, PH = 450;
+  const SERIF = 'italic 700 46px "Playfair Display", Georgia, serif';
+  const TYPE = '36px "Special Elite", "Courier New", monospace';
+
+  function makeDoodle(o) {
+    return { id: o.id, name: o.name, side: 52, top: 120, gap: 46, m: 0, mb: 0, cap: o.cap || 360,
+      bg(c, W, H) { if (o.pattern === 'stripes') stripes(c, W, H, '#ffffff', o.dot, 26); else polka(c, 0, 0, W, H, o.base, o.dot, 6, 40); grain(c, W, H, .05, 3); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.14)'; c.shadowBlur = 8; c.shadowOffsetY = 3; c.fillStyle = '#fff'; ticketPath(c, r.px - 16, r.py - 16, PW + 32, PH + 32, 62); c.fill(); c.restore(); },
+      clip(c, r) { ticketPath(c, r.px, r.py, PW, PH, 46); },
+      caption(c, W, H, cells, text) {
+        const capTop = H - this.cap;
+        handText(c, text, W / 2, capTop + 62, W - 140, 52, '#1e1a18', '#fff');
+        const dy = capTop + (o.deco === 'carousel' ? 225 : 210);
+        if (o.deco === 'carousel') carousel(c, W / 2, dy, .78, o.accent);
+        if (o.deco === 'music') { notes(c, W / 2 - 150, dy - 40, 70, o.tag); sparkle(c, W / 2 + 150, dy - 10, 56, o.accent); doodleStar(c, W / 2, dy + 30, 34, o.accent, 11, false); }
+        if (o.deco === 'cherries') { cherries(c, W / 2 - 40, dy, 1.1); heartTag(c, W / 2 + 120, dy + 30, 40, o.accent, '♡'); doodleStar(c, W / 2 - 170, dy + 40, 28, o.accent, 9, false); }
+      },
+      over(c, W, H, cells) {
+        photoPlace(c, W - 40, 52);
+        doodleStar(c, 76, 66, 36, o.accent, 4, o.deco === 'music');
+        const a = cells[0], b = cells[Math.min(1, cells.length - 1)];
+        numTag(c, a.x - 30, a.y + 70, String(cells.length).padStart(2, '0'));
+        heartTag(c, a.x + a.w - 30, a.y + a.h - 6, 34, o.tag, '13');
+        if (cells.length > 2) doodleStar(c, b.x - 6, b.y + b.h + 20, 26, o.accent, 21, true);
+      } };
+  }
+
+  const FRAMES = [
+    { id: 'burgundy', name: 'Burgundy', side: 46, top: 48, gap: 26, m: 0, mb: 0, cap: 230,
+      bg(c, W, H) { c.fillStyle = '#6E0D1E'; c.fillRect(0, 0, W, H); grain(c, W, H, .06, 1); },
+      cell(c, r) { c.fillStyle = '#fbf8f2'; c.fillRect(r.px - 4, r.py - 4, PW + 8, PH + 8); },
+      caption(c, W, H, cells, text) {
+        const capTop = H - this.cap;
+        stub(c, W - 46 - 230, capTop + 42, 230, 136, -.03);
+        c.save(); c.fillStyle = '#F3E3C8'; c.font = 'italic 700 40px "Playfair Display", Georgia, serif'; c.textAlign = 'left'; c.textBaseline = 'middle';
+        const lines = wrapLines(c, text, W - 46 * 2 - 270).slice(0, 3);
+        lines.forEach((l, i) => c.fillText(l, 46, capTop + 110 + (i - (lines.length - 1) / 2) * 46));
+        c.restore();
+      } },
+    { id: 'crochet', name: 'Crochet lace', side: 116, top: 116, gap: 18, m: 0, mb: 0, cap: 190,
+      bg(c, W, H, cells) { polka(c, 0, 0, W, H, '#EEE8DC', '#1e1a18', 9, 60); grain(c, W, H, .05, 2);
+        const last = cells[cells.length - 1]; crochetRing(c, 116 - 18, 116 - 18, W - 232 + 36, last.y + last.h - 116 + 36, 58);
+        c.fillStyle = '#fffdf8'; c.fillRect(116 - 18, 116 - 18, W - 232 + 36, last.y + last.h - 116 + 36); },
+      caption(c, W, H, cells, text) {
+        c.save(); c.font = TYPE; const tw = Math.min(c.measureText(text).width + 60, W - 120), cy = H - this.cap / 2 + 10;
+        c.shadowColor = 'rgba(0,0,0,.2)'; c.shadowBlur = 6; c.shadowOffsetY = 2; c.fillStyle = '#fffdf8'; c.fillRect(W / 2 - tw / 2, cy - 34, tw, 68); c.shadowColor = 'transparent';
+        c.fillStyle = '#1e1a18'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, W / 2, cy + 2, tw - 40); c.restore();
+      } },
+    makeDoodle({ id: 'doodle-dots', name: 'Doodle dots', base: '#FAF7F0', dot: '#C49A6C', accent: '#F7EBB0', tag: '#8EC3EE', deco: 'carousel', cap: 400 }),
+    makeDoodle({ id: 'doodle-stripes', name: 'Doodle stripes', pattern: 'stripes', dot: '#86C6EC', accent: '#F7EBB0', tag: '#86C6EC', deco: 'music', cap: 330 }),
+    makeDoodle({ id: 'doodle-cherry', name: 'Cherry doodle', base: '#FBF6EE', dot: 'rgba(142,26,44,.55)', accent: '#F4D6D6', tag: '#E7A3AC', deco: 'cherries', cap: 330 }),
+    { id: 'film', name: 'Film strip', side: 100, top: 60, gap: 46, m: 0, mb: 0, cap: 110,
+      bg(c, W, H) { c.fillStyle = '#211915'; c.fillRect(0, 0, W, H); grain(c, W, H, .05, 5); },
+      caption(c, W, H, cells, text) { c.save(); c.fillStyle = '#f0a434'; c.font = TYPE; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, W / 2, H - this.cap / 2, W - 220); c.restore(); },
+      over(c, W, H, cells) {
+        c.fillStyle = '#F1EBDF';
+        for (let y = 22; y < H - 20; y += 72) { rr(c, 30, y, 44, 32, 8); c.fill(); rr(c, W - 74, y, 44, 32, 8); c.fill(); }
+        c.fillStyle = '#f0a434'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        cells.forEach((r, i) => {
+          if (r.x > 120) return;
+          const n = 24 - i, my = r.y + r.h / 2;
+          c.font = '700 30px "DM Sans", sans-serif';
+          for (const sx of [87, W - 87]) { c.save(); c.translate(sx, r.y + 40); c.rotate(-Math.PI / 2); c.fillText(String(n), 0, 0); c.restore(); }
+          c.save(); c.translate(W - 87, my + 80); c.rotate(-Math.PI / 2); c.font = '600 22px "DM Sans", sans-serif'; c.fillText(n + 'A', 0, 0);
+          c.beginPath(); c.moveTo(-50, -8); c.lineTo(-30, 0); c.lineTo(-50, 8); c.closePath(); c.strokeStyle = '#f0a434'; c.lineWidth = 2.5; c.stroke(); c.restore();
+        });
+      } },
+    { id: 'gingham', name: 'Picnic gingham', side: 0, top: 0, gap: 12, m: 32, mb: 104, cap: 0, capInLast: true,
+      bg(c, W, H) { c.fillStyle = '#e8dfd4'; c.fillRect(0, 0, W, H); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.2)'; c.shadowBlur = 8; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore();
+        gingham(c, r.x, r.y, r.w, r.h, '#fbf6ee', 'rgba(122,16,34,.38)', 18);
+        c.fillStyle = '#fbf6ee'; c.fillRect(r.px - 10, r.py + PH + 22, PW + 20, 64);
+        c.fillStyle = 'rgba(0,0,0,.2)'; c.fillRect(r.px - 3, r.py - 3, PW + 3, PH + 3); },
+      caption(c, W, H, cells, text) { const last = cells[cells.length - 1]; c.save(); c.fillStyle = '#7A1022'; c.font = SERIF; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, last.x + last.w / 2, last.py + PH + 54, last.w - 60); c.restore(); } },
+    { id: 'classic', name: 'Booth classic', side: 36, top: 36, gap: 24, m: 0, mb: 0, cap: 110,
+      bg(c, W, H) { c.fillStyle = '#FBF8F1'; c.fillRect(0, 0, W, H); grain(c, W, H, .04, 6); c.strokeStyle = '#7A1022'; c.lineWidth = 3; c.strokeRect(12, 12, W - 24, H - 24); c.lineWidth = 1.2; c.strokeRect(20, 20, W - 40, H - 40); },
+      caption(c, W, H, cells, text) { c.save(); c.fillStyle = '#3a2a22'; c.font = TYPE; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, W / 2, H - this.cap / 2 - 4, W - 100); c.restore(); } },
+  ];
+
+  // ================= classic frames are back (lace, gingham, buttons, polka...) =================
+  const OLD_FRAMES = (() => {
+  // ================= helpers =================
+  const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const loadImg = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+
+  function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  function gingham(ctx, x, y, w, h, base, stripe, s, line) {
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.fillStyle = base; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = stripe;
+    for (let i = 0; i < w / s + 2; i += 2) ctx.fillRect(x + i * s, y, s, h);
+    for (let j = 0; j < h / s + 2; j += 2) ctx.fillRect(x, y + j * s, w, s);
+    if (line) { ctx.strokeStyle = line; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let i = 1; i < w / s + 2; i += 4) { ctx.moveTo(x + i * s + s / 2, y); ctx.lineTo(x + i * s + s / 2, y + h); }
+      for (let j = 1; j < h / s + 2; j += 4) { ctx.moveTo(x, y + j * s + s / 2); ctx.lineTo(x + w, y + j * s + s / 2); }
+      ctx.stroke(); }
+    ctx.restore();
+  }
+  function polka(ctx, x, y, w, h, bg, dot, r, sp) {
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.fillStyle = bg; ctx.fillRect(x, y, w, h); ctx.fillStyle = dot;
+    for (let j = 0, row = 0; j < h + sp; j += sp / 2, row++)
+      for (let i = (row % 2) * sp / 2; i < w + sp; i += sp) { ctx.beginPath(); ctx.arc(x + i, y + j, r, 0, TAU); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // Lace band, drawn vertically: outer edge at x=0, scalloped inner edge at x=bw
+  function laceBand(ctx, len, bw, col, bg) {
+    ctx.save();
+    ctx.globalAlpha = .3; ctx.fillStyle = col; ctx.fillRect(0, 0, bw, len);
+    ctx.globalAlpha = .45; ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let d = -bw; d < len + bw; d += 9) { ctx.moveTo(0, d); ctx.lineTo(bw, d + bw); ctx.moveTo(0, d + bw); ctx.lineTo(bw, d); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = col;
+    ctx.fillRect(0, 0, 5, len); ctx.fillRect(bw - 5, 0, 5, len);
+    for (let y = 0; y < len; y += 10) { ctx.beginPath(); ctx.arc(0, y, 4.5, 0, TAU); ctx.fill(); }
+    const s = 15;
+    for (let y = s; y < len + s; y += 2 * s) {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bw, y, s, -Math.PI / 2, Math.PI / 2); ctx.fill();
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(bw + 6, y, 4, 0, TAU); ctx.fill();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bw + s + 4, y, 2.4, 0, TAU); ctx.fill();
+    }
+    for (let y = 70, k = 0; y < len; y += 130, k++) {
+      const cx = bw * .5;
+      ctx.save(); ctx.translate(cx, y); ctx.fillStyle = col;
+      const r = bw * .36;
+      for (let p = 0; p < 8; p++) { ctx.rotate(TAU / 8); ctx.beginPath(); ctx.ellipse(0, -r * .55, r * .34, r * .55, 0, 0, TAU); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(0, 0, r * .55, 0, TAU); ctx.fill();
+      ctx.strokeStyle = bg; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(0, 0, r * .38, .3, TAU - .6); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r * .18, 1, TAU - .2); ctx.stroke();
+      ctx.restore();
+      for (const side of [-1, 1]) {
+        ctx.save(); ctx.translate(cx + side * bw * .1, y + 62); ctx.rotate(side * .7); ctx.fillStyle = col;
+        ctx.beginPath(); ctx.ellipse(0, 0, bw * .13, bw * .28, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = bg; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(0, -bw * .22); ctx.lineTo(0, bw * .22); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.fillStyle = bg;
+      for (const [dx, dy] of [[-.28, 32], [.28, 34], [0, 100], [-.3, 104], [.3, 98]]) { ctx.beginPath(); ctx.arc(cx + dx * bw, y + dy, 3, 0, TAU); ctx.fill(); }
+    }
+    ctx.restore();
+  }
+  function laceSides(ctx, W, H, bw, col, bg) {
+    laceBand(ctx, H, bw, col, bg);
+    ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); laceBand(ctx, H, bw, col, bg); ctx.restore();
+  }
+
+  function drawBow(ctx, cx, cy, s, col, dark) {
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.shadowColor = 'rgba(80,50,40,.28)'; ctx.shadowBlur = s * .2; ctx.shadowOffsetY = s * .08;
+    ctx.fillStyle = col; ctx.strokeStyle = dark; ctx.lineWidth = s * .05; ctx.lineJoin = 'round';
+    for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(d * s * .62, s * 1.35); ctx.lineTo(d * s * .42, s * 1.18); ctx.lineTo(d * s * .24, s * 1.45); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(d * s * .5, -s * .95, d * s * 1.45, -s * .7, d * s * 1.3, 0); ctx.bezierCurveTo(d * s * 1.45, s * .55, d * s * .55, s * .7, 0, 0); ctx.fill(); ctx.stroke(); }
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = s * .04;
+    for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(d * s * .25, -s * .1); ctx.quadraticCurveTo(d * s * .8, -s * .5, d * s * 1.1, -s * .2); ctx.stroke(); }
+    ctx.fillStyle = col; ctx.strokeStyle = dark; ctx.lineWidth = s * .05;
+    ctx.beginPath(); ctx.ellipse(0, 0, s * .24, s * .3, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- scrapbook buttons ----------
+  const BTNS = [
+    { k: 'round', c: '#7a4b35', stripes: '#f2a7bc' },
+    { k: 'polka', c: '#f2a7bc', dot: '#e07b98', thread: '#fff4e4' },
+    { k: 'polka', c: '#ec6f98', dot: '#f7d36b', thread: '#f6e1b0' },
+    { k: 'bunny', c: '#f3dcbc' },
+    { k: 'star', c: '#e9b93a' },
+    { k: 'round', c: '#5b3a2c', stitch: true, thread: '#e8cfb8' },
+    { k: 'flower', c: '#f6cad7' },
+    { k: 'round', c: '#fbf6ee' },
+    { k: 'heart', c: '#ef9bb5' },
+    { k: 'gingham', c: '#d9446f', thread: '#fff4e4' },
+    { k: 'heart', c: '#e9c7a4' },
+    { k: 'flower2', c: '#fdf3e6', center: '#5b3a2c', thread: '#fff' },
+    { k: 'round', c: '#a9c8e8', thread: '#fff' },
+    { k: 'star', c: '#f2a7bc' },
+  ];
+  function heartPath(ctx, s) { ctx.beginPath(); ctx.moveTo(0, s * .9); ctx.bezierCurveTo(-s * 1.6, -s * .1, -s * .75, -s * 1.25, 0, -s * .45); ctx.bezierCurveTo(s * .75, -s * 1.25, s * 1.6, -s * .1, 0, s * .9); ctx.closePath(); }
+  function starPath(ctx, r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r * .52 : r; ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad); } ctx.closePath(); }
+  function flowerPath(ctx, r) { ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * TAU / 5, x = Math.cos(a) * r * .5, y = Math.sin(a) * r * .5; ctx.moveTo(x + r * .5, y); ctx.arc(x, y, r * .5, 0, TAU); } ctx.moveTo(r * .55, 0); ctx.arc(0, 0, r * .55, 0, TAU); }
+  function bunnyPath(ctx, r) { ctx.beginPath(); ctx.moveTo(r * .78, r * .2); ctx.arc(0, r * .2, r * .78, 0, TAU); for (const d of [-1, 1]) { ctx.moveTo(d * r * .35 + r * .2, -r * .7); ctx.ellipse(d * r * .35, -r * .7, r * .2, r * .45, d * .15, 0, TAU); } }
+  function shape(ctx, k, r) {
+    if (k === 'heart') heartPath(ctx, r * .95);
+    else if (k === 'star') starPath(ctx, r * 1.05);
+    else if (k === 'flower' || k === 'flower2') flowerPath(ctx, r);
+    else if (k === 'bunny') bunnyPath(ctx, r);
+    else { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); }
+  }
+  function drawButton(ctx, b, cx, cy, r, rot = 0) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
+    ctx.shadowColor = 'rgba(70,40,30,.35)'; ctx.shadowBlur = r * .3; ctx.shadowOffsetY = r * .12;
+    shape(ctx, b.k, r); ctx.fillStyle = b.c; ctx.fill('nonzero');
+    if (b.k === 'star') { ctx.lineJoin = 'round'; ctx.lineWidth = r * .22; ctx.strokeStyle = b.c; ctx.stroke(); }
+    ctx.shadowColor = 'transparent';
+    ctx.save(); shape(ctx, b.k, r); ctx.clip('nonzero');
+    if (b.k === 'polka') { ctx.fillStyle = b.dot; for (let y = -r; y <= r; y += r * .28) for (let x = -r + ((Math.round(y / (r * .28)) & 1) ? r * .14 : 0); x <= r; x += r * .28) { ctx.beginPath(); ctx.arc(x, y, r * .055, 0, TAU); ctx.fill(); } }
+    if (b.k === 'gingham') { ctx.fillStyle = 'rgba(255,255,255,.35)'; const s = r * .22; for (let i = -6; i < 6; i += 2) { ctx.fillRect(i * s, -r, s, r * 2); ctx.fillRect(-r, i * s, r * 2, s); } }
+    if (b.stripes) { ctx.fillStyle = b.stripes; for (const x of [-.62, -.5, .5, .62]) ctx.fillRect(x * r - r * .03, -r, r * .06, r * 2); }
+    const g = ctx.createRadialGradient(-r * .4, -r * .45, r * .05, -r * .1, -r * .1, r * 1.25);
+    g.addColorStop(0, 'rgba(255,255,255,.65)'); g.addColorStop(.35, 'rgba(255,255,255,.1)'); g.addColorStop(1, 'rgba(60,30,20,.22)');
+    ctx.fillStyle = g; ctx.fillRect(-r * 2, -r * 2, r * 4, r * 4);
+    ctx.restore();
+    if (['round', 'polka', 'gingham'].includes(b.k)) { ctx.strokeStyle = 'rgba(60,30,20,.2)'; ctx.lineWidth = r * .08; ctx.beginPath(); ctx.arc(0, 0, r * .74, 0, TAU); ctx.stroke(); }
+    if (b.stitch) { ctx.strokeStyle = 'rgba(255,235,215,.7)'; ctx.setLineDash([r * .06, r * .1]); ctx.lineWidth = r * .05; ctx.beginPath(); ctx.arc(0, 0, r * .6, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+    if (b.k === 'flower2') { ctx.fillStyle = b.center; ctx.beginPath(); ctx.arc(0, 0, r * .48, 0, TAU); ctx.fill(); }
+    const hole = 'rgba(70,40,30,.55)';
+    let holes;
+    if (b.k === 'bunny') holes = [[-.28, .2], [.28, .2]];
+    else if (b.k === 'star') holes = [[0, -.22], [0, .22]];
+    else if (b.k === 'flower') holes = [[-.2, 0], [.2, 0]];
+    else holes = [[-.2, -.2], [.2, -.2], [-.2, .2], [.2, .2]];
+    const hr = b.k === 'bunny' ? r * .15 : r * .1;
+    ctx.fillStyle = b.k === 'bunny' ? '#fff8f0' : hole;
+    for (const [hx, hy] of holes) { ctx.beginPath(); ctx.arc(hx * r, hy * r, hr, 0, TAU); ctx.fill(); }
+    if (b.thread && holes.length === 4) { ctx.strokeStyle = b.thread; ctx.lineWidth = r * .14; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-.2 * r, -.2 * r); ctx.lineTo(.2 * r, .2 * r); ctx.moveTo(.2 * r, -.2 * r); ctx.lineTo(-.2 * r, .2 * r); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // ================= frames =================
+  // Each frame: layout params + draw hooks. Unit: photo is 600 x 450.
+  const PW = 600, PH = 450;
+  const SERIF = 'italic 700 46px "Playfair Display", Georgia, serif';
+  const TYPE = '38px "Special Elite", "Courier New", monospace';
+
+  const FRAMES = [
+    { id: 'cherry-lace', name: 'Cherry lace', side: 90, top: 96, gap: 32, m: 14, mb: 14, cap: 120, capFont: SERIF, capColor: '#7a0f22',
+      bg(c, W, H) { polka(c, 0, 0, W, H, '#fbf5ec', 'rgba(163,19,46,.16)', 6, 44); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(110,14,31,.22)'; c.shadowBlur = 10; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore(); },
+      over(c, W, H) { laceSides(c, W, H, 62, '#a3132e', '#fbf5ec'); drawBow(c, W / 2, 50, 46, '#1e1a18', '#000');
+        drawButton(c, { k: 'heart', c: '#a3132e' }, 150, 52, 26, .3); drawButton(c, { k: 'round', c: '#fbf6ee' }, W - 150, 52, 28, -.2); } },
+    { id: 'cherry-gingham', name: 'Cherry gingham', side: 0, top: 0, gap: 12, m: 32, mb: 104, cap: 0, capInLast: true, capFont: SERIF, capColor: '#7a0f22',
+      bg(c, W, H) { c.fillStyle = '#efe4e4'; c.fillRect(0, 0, W, H); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.18)'; c.shadowBlur = 8; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore();
+        gingham(c, r.x, r.y, r.w, r.h, '#fffaf8', 'rgba(163,19,46,.42)', 18, null);
+        c.fillStyle = '#fffaf8'; c.fillRect(r.px - 10, r.py + PH + 22, PW + 20, 64);
+        c.fillStyle = 'rgba(0,0,0,.2)'; c.fillRect(r.px - 3, r.py - 3, PW + 3, PH + 3); } },
+    { id: 'gingham', name: 'Pink gingham', side: 0, top: 0, gap: 12, m: 32, mb: 104, cap: 0, capInLast: true, capFont: SERIF, capColor: '#b04a68',
+      bg(c, W, H) { c.fillStyle = '#efe6e6'; c.fillRect(0, 0, W, H); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.18)'; c.shadowBlur = 8; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore();
+        gingham(c, r.x, r.y, r.w, r.h, '#fff8f6', 'rgba(242,166,184,.5)', 18, 'rgba(196,84,108,.35)');
+        c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(r.px - 3, r.py - 3, PW + 3, PH + 3); } },
+    { id: 'gingham-blue', name: 'Blue gingham', side: 0, top: 0, gap: 12, m: 32, mb: 104, cap: 0, capInLast: true, capFont: SERIF, capColor: '#4f6fa0',
+      bg(c, W, H) { c.fillStyle = '#e6ebf2'; c.fillRect(0, 0, W, H); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.18)'; c.shadowBlur = 8; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore();
+        gingham(c, r.x, r.y, r.w, r.h, '#f8fbff', 'rgba(150,186,226,.5)', 18, 'rgba(79,111,160,.35)');
+        c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(r.px - 3, r.py - 3, PW + 3, PH + 3); } },
+    { id: 'film', name: 'Film strip', side: 100, top: 60, gap: 46, m: 0, mb: 0, cap: 110, capFont: TYPE, capColor: '#f0a434',
+      bg(c, W, H) { c.fillStyle = '#211915'; c.fillRect(0, 0, W, H); },
+      over(c, W, H, cells) {
+        c.fillStyle = '#fff6ec';
+        for (let y = 22; y < H - 20; y += 72) { rr(c, 30, y, 44, 32, 8); c.fill(); rr(c, W - 74, y, 44, 32, 8); c.fill(); }
+        c.fillStyle = '#f0a434'; c.font = '700 30px "DM Sans", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        cells.forEach((r, i) => {
+          const n = 24 - i, my = r.y + r.h / 2;
+          c.save(); c.translate(87, r.y + 40); c.rotate(-Math.PI / 2); c.fillText(String(n), 0, 0); c.restore();
+          c.save(); c.translate(W - 87, r.y + 40); c.rotate(-Math.PI / 2); c.fillText(String(n), 0, 0); c.restore();
+          c.save(); c.translate(W - 87, my + 80); c.rotate(-Math.PI / 2); c.font = '600 22px "DM Sans", sans-serif'; c.fillText(n + 'A', 0, 0);
+          c.beginPath(); c.moveTo(-50, -8); c.lineTo(-30, 0); c.lineTo(-50, 8); c.closePath(); c.strokeStyle = '#f0a434'; c.lineWidth = 2.5; c.stroke(); c.restore();
+        });
+      } },
+    { id: 'lace', name: 'Pink lace', side: 90, top: 96, gap: 32, m: 14, mb: 14, cap: 120, capFont: SERIF, capColor: '#b04a68',
+      bg(c, W, H) { polka(c, 0, 0, W, H, '#fffaf4', 'rgba(229,143,166,.22)', 6, 44); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(107,74,58,.2)'; c.shadowBlur = 10; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore(); },
+      over(c, W, H) { laceSides(c, W, H, 62, '#eaa6b8', '#fffaf4'); drawBow(c, W / 2, 50, 46, '#a9c8e8', '#6f8fbf');
+        drawButton(c, BTNS[12], 150, 52, 26, .3); drawButton(c, BTNS[8], W - 150, 52, 28, -.2); } },
+    { id: 'lace-blue', name: 'Blue lace', side: 90, top: 96, gap: 32, m: 14, mb: 14, cap: 120, capFont: SERIF, capColor: '#4f6fa0',
+      bg(c, W, H) { polka(c, 0, 0, W, H, '#f6faff', 'rgba(150,186,226,.3)', 6, 44); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(79,111,160,.2)'; c.shadowBlur = 10; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore(); },
+      over(c, W, H) { laceSides(c, W, H, 62, '#9fbfe3', '#f6faff'); drawBow(c, W / 2, 50, 46, '#f4b6c2', '#c9708a');
+        drawButton(c, BTNS[1], 150, 52, 26, .3); drawButton(c, BTNS[6], W - 150, 52, 28, -.2); } },
+    { id: 'buttons', name: 'Button box', side: 56, top: 70, gap: 40, m: 18, mb: 18, cap: 150, capPad: 130, capFont: SERIF, capColor: '#6b4a3a',
+      bg(c, W, H) { polka(c, 0, 0, W, H, '#f7dce3', 'rgba(255,255,255,.75)', 8, 46); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(107,74,58,.22)'; c.shadowBlur = 10; c.shadowOffsetY = 5; c.fillStyle = '#fffaf2'; c.fillRect(r.x, r.y, r.w, r.h); c.restore();
+        c.save(); c.strokeStyle = '#d58fa2'; c.lineWidth = 3; c.setLineDash([12, 9]); c.strokeRect(r.x + 8, r.y + 8, r.w - 16, r.h - 16); c.restore(); },
+      over(c, W, H, cells) {
+        const R = rng(7);
+        cells.forEach((r, i) => {
+          const pick = [0, 9, 4, 1][i % 4], x = i % 2 ? r.x + r.w - 4 : r.x + 4, y = r.y + 6;
+          drawButton(c, BTNS[pick], x, y, 44 + R() * 8, (R() - .5) * .8);
+          if (i === 1) drawButton(c, BTNS[6], r.x + 6, r.y + r.h - 8, 34, .2);
+          if (i === 2) drawButton(c, BTNS[13], r.x + r.w - 8, r.y + r.h - 10, 32, -.3);
+        });
+        drawButton(c, BTNS[3], 64, H - 76, 42, -.2); drawButton(c, BTNS[11], W - 66, H - 84, 40, .2); drawButton(c, BTNS[8], W - 120, H - 34, 24, .3);
+      } },
+    { id: 'polka', name: 'Cherry polka', side: 48, top: 64, gap: 30, m: 16, mb: 16, cap: 120, capFont: SERIF, capColor: '#ffffff',
+      bg(c, W, H) { polka(c, 0, 0, W, H, '#e58fa6', 'rgba(255,255,255,.9)', 9, 52); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(120,40,60,.3)'; c.shadowBlur = 10; c.shadowOffsetY = 4; c.fillStyle = '#fff'; rr(c, r.x, r.y, r.w, r.h, 10); c.fill(); c.restore(); },
+      over(c, W, H) {
+        c.fillStyle = '#fff6ec';
+        for (let x = 0; x <= W + 20; x += 36) { c.beginPath(); c.arc(x, 0, 16, 0, TAU); c.fill(); c.beginPath(); c.arc(x, H, 16, 0, TAU); c.fill(); }
+        drawBow(c, W / 2, 40, 34, '#a9c8e8', '#6f8fbf');
+      } },
+    { id: 'beige-gingham', name: 'Beige gingham', side: 0, top: 0, gap: 12, m: 32, mb: 104, cap: 0, capInLast: true, capFont: SERIF, capColor: '#6b4a3a',
+      bg(c, W, H) { c.fillStyle = '#ece4d8'; c.fillRect(0, 0, W, H); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.18)'; c.shadowBlur = 8; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore();
+        gingham(c, r.x, r.y, r.w, r.h, '#fbf6ee', 'rgba(196,166,128,.5)', 18, 'rgba(107,74,58,.35)');
+        c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(r.px - 3, r.py - 3, PW + 3, PH + 3); } },
+    { id: 'noir-gingham', name: 'B&W gingham', side: 0, top: 0, gap: 12, m: 32, mb: 104, cap: 0, capInLast: true, capFont: SERIF, capColor: '#1e1a18',
+      bg(c, W, H) { c.fillStyle = '#e4e2df'; c.fillRect(0, 0, W, H); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.22)'; c.shadowBlur = 8; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore();
+        gingham(c, r.x, r.y, r.w, r.h, '#ffffff', 'rgba(30,26,24,.42)', 18, null);
+        c.fillStyle = '#fff'; c.fillRect(r.px - 10, r.py + PH + 22, PW + 20, 64);
+        c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(r.px - 3, r.py - 3, PW + 3, PH + 3); } },
+    { id: 'beige-lace', name: 'Beige lace', side: 90, top: 96, gap: 32, m: 14, mb: 14, cap: 120, capFont: SERIF, capColor: '#6b4a3a',
+      bg(c, W, H) { polka(c, 0, 0, W, H, '#f6efe4', 'rgba(107,74,58,.14)', 6, 44); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(107,74,58,.22)'; c.shadowBlur = 10; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore(); },
+      over(c, W, H) { laceSides(c, W, H, 62, '#d6bf9e', '#f6efe4'); drawBow(c, W / 2, 50, 46, '#1e1a18', '#000');
+        drawButton(c, BTNS[7], 150, 52, 26, .3); drawButton(c, BTNS[5], W - 150, 52, 28, -.2); } },
+    { id: 'noir-lace', name: 'Noir lace', side: 90, top: 96, gap: 32, m: 14, mb: 14, cap: 120, capFont: SERIF, capColor: '#f6f1ea',
+      bg(c, W, H) { polka(c, 0, 0, W, H, '#1e1a18', 'rgba(255,255,255,.1)', 6, 44); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 12; c.shadowOffsetY = 4; c.fillStyle = '#fff'; c.fillRect(r.x, r.y, r.w, r.h); c.restore(); },
+      over(c, W, H) { laceSides(c, W, H, 62, '#efe8de', '#1e1a18'); drawBow(c, W / 2, 50, 46, '#f6f1ea', '#9a918a');
+        drawButton(c, BTNS[7], 150, 52, 26, .3); drawButton(c, BTNS[7], W - 150, 52, 28, -.2); } },
+    { id: 'noir-polka', name: 'Noir polka', side: 48, top: 64, gap: 30, m: 16, mb: 16, cap: 120, capFont: SERIF, capColor: '#ffffff',
+      bg(c, W, H) { polka(c, 0, 0, W, H, '#1e1a18', 'rgba(255,255,255,.92)', 9, 52); },
+      cell(c, r) { c.save(); c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 10; c.shadowOffsetY = 4; c.fillStyle = '#fff'; rr(c, r.x, r.y, r.w, r.h, 10); c.fill(); c.restore(); },
+      over(c, W, H) {
+        c.fillStyle = '#e9dcc8';
+        for (let x = 0; x <= W + 20; x += 36) { c.beginPath(); c.arc(x, 0, 16, 0, TAU); c.fill(); c.beginPath(); c.arc(x, H, 16, 0, TAU); c.fill(); }
+        drawBow(c, W / 2, 40, 34, '#f4b6c2', '#c9708a');
+      } },
+    { id: 'classic', name: 'Classic', side: 36, top: 36, gap: 24, m: 0, mb: 0, cap: 100, capFont: TYPE, capColor: '#3a2a22',
+      bg(c, W, H) { c.fillStyle = '#fffdf8'; c.fillRect(0, 0, W, H); } },
+    { id: 'beige', name: 'Beige', side: 36, top: 36, gap: 24, m: 0, mb: 0, cap: 100, capFont: TYPE, capColor: '#6b4a3a',
+      bg(c, W, H) { c.fillStyle = '#e9dcc8'; c.fillRect(0, 0, W, H); } },
+    { id: 'noir', name: 'Noir', side: 36, top: 36, gap: 24, m: 0, mb: 0, cap: 100, capFont: TYPE, capColor: '#f6f1ea',
+      bg(c, W, H) { c.fillStyle = '#141110'; c.fillRect(0, 0, W, H); } },
+  ];
+    FRAMES.forEach(f => {
+      f.caption = function (c, W, H, cells, text) {
+        c.save(); c.fillStyle = this.capColor; c.font = this.capFont; c.textAlign = 'center'; c.textBaseline = 'middle';
+        if (this.capInLast) {
+          const last = cells[cells.length - 1], multi = cells.length > 1 && cells[0].y === cells[1].y;
+          c.fillText(text, multi ? W / 2 : last.x + last.w / 2, last.py + PH + this.mb / 2, multi ? W - 80 : last.w - 60);
+        } else c.fillText(text, W / 2, H - this.cap / 2, W - 2 * (this.capPad || this.side) - 40);
+        c.restore();
+      };
+    });
+    return FRAMES;
+  })();
+  {
+    const rename = { gingham: 'pink-gingham', classic: 'white-classic' };
+    const olds = OLD_FRAMES.filter(f => f.id !== 'film');
+    olds.forEach(f => { if (rename[f.id]) f.id = rename[f.id]; });
+    const girly = ['lace', 'cherry-lace', 'pink-gingham', 'lace-blue', 'buttons', 'gingham-blue', 'polka', 'cherry-gingham'];
+    const pick = girly.map(id => olds.find(f => f.id === id));
+    FRAMES.unshift(...pick);
+    FRAMES.push(...olds.filter(f => !girly.includes(f.id)));
+  }
+
+  {
+    const pri = ['cherry-lace', 'burgundy', 'crochet', 'cherry-gingham', 'polka', 'doodle-cherry', 'beige-lace', 'beige-gingham', 'noir-gingham', 'noir-lace', 'noir-polka',
+      'doodle-dots', 'doodle-stripes', 'film', 'gingham', 'classic', 'white-classic', 'beige', 'noir', 'buttons', 'lace', 'pink-gingham', 'lace-blue', 'gingham-blue'];
+    const rank = f => { const r = pri.indexOf(f.id); return r < 0 ? 99 : r; };
+    FRAMES.sort((a, b) => rank(a) - rank(b));
+  }
+  function geometry(f, L) {
+    const cw = PW + 2 * f.m, ch = PH + f.m + f.mb;
+    const W = 2 * f.side + L.cols * cw + (L.cols - 1) * f.gap;
+    const H = f.top + L.rows * ch + (L.rows - 1) * f.gap + (f.cap || f.top || f.gap);
+    const cells = [];
+    for (let i = 0; i < L.cols * L.rows; i++) {
+      const col = i % L.cols, row = Math.floor(i / L.cols);
+      const x = f.side + col * (cw + f.gap), y = f.top + row * (ch + f.gap);
+      cells.push({ x, y, w: cw, h: ch, px: x + f.m, py: y + f.m });
+    }
+    return { W, H, cells };
+  }
+
+  // ================= filters (pixel based) =================
+  const FILTERS = [
+    { id: 'none', name: 'Original' }, { id: 'bw', name: 'Silver B&W' }, { id: 'warm', name: 'Warm film' },
+    { id: 'vintage', name: '1970s' }, { id: 'sepia', name: 'Sepia' }, { id: 'cool', name: 'Faded blue' },
+  ];
+  const clamp = v => v < 0 ? 0 : v > 255 ? 255 : v;
+  function applyFilter(data, id) {
+    if (id === 'none') return;
+    const d = data.data;
+    for (let i = 0; i < d.length; i += 4) {
+      let r = d[i], g = d[i + 1], b = d[i + 2];
+      const l = .299 * r + .587 * g + .114 * b;
+      const sep = a => { const sr = .393 * r + .769 * g + .189 * b, sg = .349 * r + .686 * g + .168 * b, sb = .272 * r + .534 * g + .131 * b; r += (sr - r) * a; g += (sg - g) * a; b += (sb - b) * a; };
+      if (id === 'bw') { const v = (l - 128) * 1.22 + 128; r = g = b = v; }
+      else if (id === 'warm') { sep(.28); r += 12; b -= 10; }
+      else if (id === 'vintage') { sep(.55); r = (r - 128) * .86 + 142; g = (g - 128) * .86 + 134; b = (b - 128) * .86 + 120; }
+      else if (id === 'sepia') { sep(1); }
+      else if (id === 'cool') { r = r * .92 + 10; g = g * .98 + 12; b = b * 1.02 + 24; const m = (r + g + b) / 3; r = m + (r - m) * .7; g = m + (g - m) * .7; b = m + (b - m) * .7; }
+      d[i] = clamp(r); d[i + 1] = clamp(g); d[i + 2] = clamp(b);
+    }
+  }
+  const fcache = new Map();
+  async function filtered(src, id) {
+    const key = id + '|' + src.length + '|' + src.slice(-48);
+    if (fcache.has(key)) return fcache.get(key);
+    const img = await loadImg(src);
+    const c = document.createElement('canvas'); c.width = 640; c.height = 480;
+    const g = c.getContext('2d');
+    if (img) { const s = Math.max(640 / img.width, 480 / img.height), w = img.width * s, h = img.height * s; g.drawImage(img, (640 - w) / 2, (480 - h) / 2, w, h); const data = g.getImageData(0, 0, 640, 480); applyFilter(data, id); g.putImageData(data, 0, 0); }
+    fcache.set(key, c); return c;
+  }
+
+  // ================= sample photos: cute colorful friends =================
+  const samples = [];
+  function samplePhoto(i) {
+    if (samples[i]) return samples[i];
+    const c = document.createElement('canvas'); c.width = 640; c.height = 480; const g = c.getContext('2d'); const R = rng(300 + i), k = i % 4;
+    const bgs = [['#F3E7D3', '#E0CCAA'], ['#ECE6DA', '#CFC3AC'], ['#F2E2D2', '#DCBFA4'], ['#EAE3D6', '#CDBFA6']][k];
+    const grd = g.createLinearGradient(0, 0, 0, 480); grd.addColorStop(0, bgs[0]); grd.addColorStop(1, bgs[1]); g.fillStyle = grd; g.fillRect(0, 0, 640, 480);
+    g.fillStyle = 'rgba(255,255,255,.6)';
+    for (let y = 18, row = 0; y < 500; y += 46, row++) for (let x = (row % 2) * 23; x < 660; x += 46) {
+      if (k === 2 || k === 3) { heartPath(g, x, y, 8); g.fill(); } else { g.beginPath(); g.arc(x, y, 6.5, 0, TAU); g.fill(); }
+    }
+    const bow = (x, y, sc, col) => {
+      g.save(); g.translate(x, y); g.scale(sc, sc); g.fillStyle = col; g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 3;
+      for (const d of [-1, 1]) { g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(d * 30, -34, d * 62, -26, d * 58, 0); g.bezierCurveTo(d * 62, 26, d * 30, 34, 0, 0); g.fill(); g.stroke(); }
+      for (const d of [-1, 1]) { g.beginPath(); g.moveTo(d * 4, 6); g.lineTo(d * 26, 46); g.lineTo(d * 12, 44); g.closePath(); g.fill(); }
+      g.beginPath(); g.ellipse(0, 0, 13, 15, 0, 0, TAU); g.fill(); g.stroke();
+      g.restore();
+    };
+    function person(cx, cy, sc, o) {
+      g.save(); g.translate(cx, cy); g.rotate(o.tilt || 0); g.scale(sc, sc);
+      g.fillStyle = o.top; g.beginPath(); g.ellipse(0, 270, 160, 150, 0, Math.PI, 0); g.fill();
+      if (o.dots) { g.save(); g.beginPath(); g.ellipse(0, 270, 160, 150, 0, Math.PI, 0); g.clip(); g.fillStyle = 'rgba(255,255,255,.75)'; for (let y = 130, r = 0; y < 280; y += 26, r++) for (let x = -160 + (r % 2) * 13; x < 170; x += 26) { g.beginPath(); g.arc(x, y, 5, 0, TAU); g.fill(); } g.restore(); }
+      g.fillStyle = '#fff'; g.beginPath(); g.moveTo(-46, 126); g.quadraticCurveTo(-26, 170, 0, 140); g.quadraticCurveTo(26, 170, 46, 126); g.closePath(); g.fill();
+      g.fillStyle = o.skin; g.fillRect(-22, 70, 44, 64);
+      g.fillStyle = o.hair;
+      if (o.style === 'long') { rr(g, -96, -64, 192, 210, 80); g.fill(); }
+      if (o.style === 'pig') for (const d of [-1, 1]) { g.beginPath(); g.ellipse(d * 100, 46, 30, 60, d * .35, 0, TAU); g.fill(); }
+      if (o.style === 'bun') { g.beginPath(); g.arc(0, -100, 42, 0, TAU); g.fill(); }
+      g.fillStyle = o.skin; g.beginPath(); g.ellipse(0, 0, 80, 92, 0, 0, TAU); g.fill();
+      g.fillStyle = o.hair; g.beginPath(); g.moveTo(-88, -6); g.bezierCurveTo(-96, -120, 96, -120, 88, -6);
+      g.quadraticCurveTo(70, -48, 26, -40); g.quadraticCurveTo(0, -60, -26, -40); g.quadraticCurveTo(-70, -48, -88, -6); g.fill();
+      g.lineCap = 'round';
+      if (o.glasses) {
+        g.fillStyle = o.glasses; for (const d of [-1, 1]) { heartPath(g, d * 32, 10, 24); g.fill(); }
+        g.strokeStyle = o.glasses; g.lineWidth = 5; g.beginPath(); g.moveTo(-10, 2); g.quadraticCurveTo(0, -4, 10, 2); g.stroke();
+        g.fillStyle = 'rgba(255,255,255,.7)'; for (const d of [-1, 1]) { g.beginPath(); g.ellipse(d * 32 - 9, 2, 5, 3.5, -.5, 0, TAU); g.fill(); }
+      } else if (o.happy) {
+        g.strokeStyle = '#3a2420'; g.lineWidth = 6; for (const d of [-1, 1]) { g.beginPath(); g.arc(d * 30, 14, 12, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); }
+      } else {
+        for (const d of [-1, 1]) {
+          g.fillStyle = '#2b1b18'; g.beginPath(); g.ellipse(d * 30, 10, 10, 13, 0, 0, TAU); g.fill();
+          g.fillStyle = '#fff'; g.beginPath(); g.arc(d * 30 + 3, 5, 3.6, 0, TAU); g.fill();
+          g.strokeStyle = '#2b1b18'; g.lineWidth = 3; g.beginPath(); g.moveTo(d * 38, 0); g.lineTo(d * 46, -6); g.stroke();
+        }
+      }
+      g.fillStyle = 'rgba(255,105,140,.42)'; for (const d of [-1, 1]) { g.beginPath(); g.ellipse(d * 50, 38, 17, 10, 0, 0, TAU); g.fill(); }
+      if (o.open) { g.fillStyle = '#9b2335'; g.beginPath(); g.arc(0, 40, 20, 0, Math.PI); g.closePath(); g.fill(); g.fillStyle = '#ff8fa8'; g.beginPath(); g.ellipse(0, 52, 10, 5, 0, 0, TAU); g.fill(); }
+      else { g.strokeStyle = '#8a2a33'; g.lineWidth = 6; g.beginPath(); g.arc(0, 34, 22, Math.PI * .18, Math.PI * .82); g.stroke(); }
+      if (o.bow) bow(o.bowX || 52, o.bowY || -82, .8, o.bow);
+      g.restore();
+    }
+    const scenes = [
+      [[320, 196, 1, { skin: '#F6D3B8', hair: '#5a3420', style: 'long', top: '#2E4A7A', dots: 1, bow: '#A3132E' }]],
+      [[205, 214, .84, { skin: '#E8B48F', hair: '#E2B65C', style: 'bun', top: '#A3132E', tilt: .1, open: 1 }],
+       [435, 206, .86, { skin: '#C98E66', hair: '#1E1A1A', style: 'pig', top: '#1E1A18', dots: 1, tilt: -.1, happy: 1, bow: '#C8102E', bowX: -50 }]],
+      [[320, 200, 1, { skin: '#F2C9A9', hair: '#B5523B', style: 'pig', top: '#A3132E', dots: 1, glasses: '#C8102E', open: 1 }]],
+      [[262, 214, .88, { skin: '#8D5A3B', hair: '#2a1a14', style: 'long', top: '#FFFFFF', tilt: .14, happy: 1, bow: '#A3132E' }],
+       [384, 206, .88, { skin: '#F6D3B8', hair: '#7A4A2A', style: 'bun', top: '#C8102E', dots: 1, tilt: -.12 }]],
+    ][k];
+    scenes.forEach(([x, y, sc, o]) => person(x, y, sc, o));
+    for (let n = 0; n < 7; n++) {
+      const x = 30 + R() * 580, y = 30 + R() * 200; if (Math.abs(x - 320) < 150 && y > 90) continue;
+      g.save(); g.translate(x, y); g.rotate((R() - .5) * .6); g.fillStyle = ['#C8102E', '#1E1A18', '#fff', '#A3132E'][n % 4]; heartPath(g, 0, 0, 9 + R() * 9); g.fill(); g.restore();
+    }
+    g.fillStyle = '#fff';
+    for (let n = 0; n < 6; n++) { const x = 20 + R() * 600, y = 20 + R() * 440, r = 6 + R() * 8; g.beginPath(); g.moveTo(x, y - r); g.quadraticCurveTo(x, y, x + r, y); g.quadraticCurveTo(x, y, x, y + r); g.quadraticCurveTo(x, y, x - r, y); g.quadraticCurveTo(x, y, x, y - r); g.fill(); }
+    const v = g.createRadialGradient(320, 220, 160, 320, 240, 440); v.addColorStop(0, 'rgba(255,255,255,0)'); v.addColorStop(1, 'rgba(60,35,20,.35)'); g.fillStyle = v; g.fillRect(0, 0, 640, 480);
+    for (let n = 0; n < 4000; n++) { g.fillStyle = R() > .5 ? 'rgba(0,0,0,.05)' : 'rgba(255,255,255,.07)'; g.fillRect(R() * 640, R() * 480, 1.5, 1.5); }
+    return samples[i] = c.toDataURL('image/jpeg', .9);
+  }
+
+  // ================= state =================
+  const state = { layout: '4x1', shots: [], frame: FRAMES[0], filter: FILTERS[0], caption: '', date: true, stream: null, busy: false };
+  const N = () => LAYOUTS[state.layout].cols * LAYOUTS[state.layout].rows;
+  const wide = () => LAYOUTS[state.layout].cols > 1;
+  function captionText(override) {
+    const parts = [], c = override !== undefined ? override : state.caption;
+    if (c) parts.push(c);
+    if (state.date) parts.push(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }));
+    return parts.join(' · ');
+  }
+
+  // ================= renderer =================
+  async function renderStrip(canvas, o = {}) {
+    const f = o.frame || state.frame, fl = o.filter || state.filter, L = LAYOUTS[o.layout || state.layout];
+    const shots = o.shots || state.shots, scale = o.scale || .5, n = L.cols * L.rows;
+    const token = (canvas._t = (canvas._t || 0) + 1);
+    const photos = await Promise.all(Array.from({ length: n }, (_, i) => filtered(shots[i] || samplePhoto(i % 4), fl.id)));
+    if (token !== canvas._t) return;
+    const { W, H, cells } = geometry(f, L);
+    canvas.width = Math.round(W * scale); canvas.height = Math.round(H * scale);
+    const c = canvas.getContext('2d'); c.setTransform(scale, 0, 0, scale, 0, 0);
+    f.bg(c, W, H, cells);
+    cells.forEach((r, i) => {
+      if (f.cell) f.cell(c, r, i);
+      c.save(); if (f.clip) { f.clip(c, r); c.clip(); }
+      c.drawImage(photos[i], 0, 0, 640, 480, r.px, r.py, PW, PH); c.restore();
+    });
+    const text = (o.caption !== undefined ? o.caption : captionText()) || 'snapstrip';
+    f.caption(c, W, H, cells, text);
+    if (f.over) f.over(c, W, H, cells);
+    return canvas;
+  }
+
+  // ================= sound =================
+  let actx;
+  const ac = () => { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); return actx; } catch (_) { return null; } };
+  function noiseBurst(dur, vol) { const a = ac(); if (!a) return; const buf = a.createBuffer(1, a.sampleRate * dur, a.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); const s = a.createBufferSource(), gn = a.createGain(); gn.gain.value = vol; s.buffer = buf; s.connect(gn).connect(a.destination); s.start(); }
+  function motor(dur) {
+    const a = ac(); if (!a) return; const t = a.currentTime;
+    const o1 = a.createOscillator(), o2 = a.createOscillator(), lp = a.createBiquadFilter(), gn = a.createGain();
+    o1.type = 'sawtooth'; o1.frequency.setValueAtTime(92, t); o1.frequency.linearRampToValueAtTime(118, t + dur);
+    o2.type = 'square'; o2.frequency.value = 46; lp.type = 'lowpass'; lp.frequency.value = 700;
+    gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(.06, t + .03); gn.gain.setValueAtTime(.06, t + dur - .05); gn.gain.linearRampToValueAtTime(0, t + dur);
+    o1.connect(lp); o2.connect(lp); lp.connect(gn).connect(a.destination); o1.start(t); o2.start(t); o1.stop(t + dur); o2.stop(t + dur);
+  }
+  function ding() { const a = ac(); if (!a) return; const t = a.currentTime, o = a.createOscillator(), gn = a.createGain(); o.type = 'sine'; o.frequency.value = 1320; gn.gain.setValueAtTime(.12, t); gn.gain.exponentialRampToValueAtTime(.0001, t + 1.2); o.connect(gn).connect(a.destination); o.start(t); o.stop(t + 1.2); }
+
+  // ================= navigation =================
+  function go(id) {
+    $$('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+    const idx = order.indexOf(id);
+    $$('.ticket').forEach((t, i) => t.classList.toggle('on', i === idx));
+    if (id === 'booth') startCamera(); else stopCamera();
+    if (id === 'style') { renderStyle(); buildFrames(); buildFilters(); }
+    if (id === 'result') { printSequence(); window.dispatchEvent(new Event('snapstrip:result')); }
+    window.scrollTo(0, 0);
+  }
+  $$('[data-go]').forEach(el => el.addEventListener('click', () => go(el.dataset.go)));
+
+  // ================= landing =================
+  $('#startBtn').addEventListener('click', () => { ac(); state.shots = []; go('booth'); });
+  $('#uploadLink').addEventListener('click', () => $('#fileInput').click());
+  $('#fileInput').addEventListener('change', async e => {
+    const files = [...e.target.files].slice(0, N());
+    if (!files.length) return;
+    state.shots = await Promise.all(files.map(f => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); })));
+    const k = state.shots.length; while (state.shots.length < N()) state.shots.push(state.shots[state.shots.length % k]);
+    e.target.value = ''; go('style');
+  });
+
+  // ================= booth =================
+  function buildLayoutChips() {
+    const box = $('#layoutChips'); box.innerHTML = '';
+    Object.entries(LAYOUTS).forEach(([key, L]) => {
+      const b = document.createElement('button'); b.className = 'chip' + (key === state.layout ? ' on' : '');
+      b.innerHTML = `<span class="lay" style="grid-template-columns:repeat(${L.cols},7px)">${'<i></i>'.repeat(L.cols * L.rows)}</span>${L.label}`;
+      b.addEventListener('click', () => { if (state.busy) return; state.layout = key; buildLayoutChips(); renderThumbs(); });
+      box.appendChild(b);
+    });
+  }
+  const video = $('#video');
+  async function startCamera() {
+    buildLayoutChips(); renderThumbs();
+    if (state.stream || !navigator.mediaDevices?.getUserMedia) return;
+    try { state.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 960 }, audio: false }); video.srcObject = state.stream; $('#fake').style.display = 'none'; }
+    catch (err) { $('#fake').style.display = 'flex'; }
+  }
+  function stopCamera() { if (state.stream) { state.stream.getTracks().forEach(t => t.stop()); state.stream = null; } video.srcObject = null; $('#fake').style.display = 'flex'; }
+  function capture(i) {
+    if (state.stream && video.videoWidth) {
+      const c = document.createElement('canvas'); c.width = 640; c.height = 480; const g = c.getContext('2d'), vw = video.videoWidth, vh = video.videoHeight;
+      let sw = vw, sh = vw * .75; if (sh > vh) { sh = vh; sw = vh / .75; }
+      g.translate(640, 0); g.scale(-1, 1); g.drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, 640, 480);
+      return c.toDataURL('image/jpeg', .92);
+    }
+    return samplePhoto(i % 4);
+  }
+  async function shoot(indices) {
+    if (state.busy) return;
+    state.busy = true; $('#shutter').disabled = true;
+    for (const i of indices) {
+      $('#poseLabel').textContent = `POSE ${i + 1} / ${N()}`;
+      $('#boothHint').textContent = 'look into the lens… smile!';
+      for (let n = 3; n > 0; n--) { $('#countdown').textContent = n; await wait(700); }
+      $('#countdown').textContent = '';
+      const fl = $('#flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+      noiseBurst(.08, .9);
+      state.shots[i] = capture(i); renderThumbs(); await wait(450);
+    }
+    $('#poseLabel').textContent = '';
+    state.busy = false; $('#shutter').disabled = false;
+    if ([...Array(N()).keys()].every(i => state.shots[i])) { $('#boothHint').textContent = 'lovely! tap a photo to retake it'; await wait(500); go('style'); }
+  }
+  function renderThumbs() {
+    const t = $('#thumbs'); t.innerHTML = '';
+    for (let i = 0; i < N(); i++) {
+      const d = document.createElement('div'); d.className = 'thumb' + (state.shots[i] ? ' filled' : '');
+      if (state.shots[i]) { const img = document.createElement('img'); img.src = state.shots[i]; d.appendChild(img); d.title = 'Retake this photo'; d.addEventListener('click', () => shoot([i])); }
+      t.appendChild(d);
+    }
+  }
+  $('#shutter').addEventListener('click', () => { ac(); const missing = [...Array(N()).keys()].filter(i => !state.shots[i]); shoot(missing.length ? missing : [...Array(N()).keys()]); });
+
+  // ================= style =================
+  function buildFrames() {
+    const box = $('#frames'); box.innerHTML = '';
+    FRAMES.forEach(f => {
+      const b = document.createElement('button'); b.className = 'fr' + (f === state.frame ? ' on' : ''); b.dataset.frame = f.id;
+      const cv = document.createElement('canvas'); b.appendChild(cv); b.appendChild(document.createTextNode(f.name));
+      b.addEventListener('click', () => { state.frame = f; $$('.fr').forEach(x => x.classList.toggle('on', x === b)); renderStyle(); });
+      box.appendChild(b);
+      renderStrip(cv, { frame: f, filter: FILTERS[0], shots: [], scale: .13, caption: 'snapstrip' });
+    });
+  }
+  function buildFilters() {
+    const box = $('#filters'); box.innerHTML = '';
+    FILTERS.forEach(fl => {
+      const b = document.createElement('button'); b.className = 'fl' + (fl === state.filter ? ' on' : '');
+      const cv = document.createElement('canvas'); cv.width = 160; cv.height = 120; b.appendChild(cv); b.appendChild(document.createTextNode(fl.name));
+      filtered(state.shots[0] || samplePhoto(0), fl.id).then(p => cv.getContext('2d').drawImage(p, 0, 0, 160, 120));
+      b.addEventListener('click', () => { state.filter = fl; $$('.fl').forEach(x => x.classList.toggle('on', x === b)); renderStyle(); });
+      box.appendChild(b);
+    });
+  }
+  function renderStyle() { $('#previewWrap').classList.toggle('wide', wide()); renderStrip($('#stylePreview'), { scale: .5 }); }
+  $$('[data-tab]').forEach(b => b.addEventListener('click', () => { $$('[data-tab]').forEach(x => x.classList.toggle('on', x === b)); $$('.panel-t').forEach(p => p.classList.toggle('on', p.id === 'panel-' + b.dataset.tab)); }));
+  $('#captionInput').addEventListener('input', e => { state.caption = e.target.value.trim(); renderStyle(); });
+  $('#dateToggle').addEventListener('change', e => { state.date = e.target.checked; renderStyle(); });
+  $('#doneBtn').addEventListener('click', () => { ac(); go('result'); });
+
+  // ================= result: the strip drops out of the booth =================
+  let printRun = 0, developFast = null;
+  async function printSequence() {
+    const run = ++printRun, res = $('#result'), cv = $('#finalStrip'), m = $('#machine'), st = $('#printStatus');
+    res.classList.add('printing');
+    const sw = wide() ? 300 : 200;
+    m.style.setProperty('--sw', sw + 'px'); m.style.setProperty('--mw', (sw + 130) + 'px');
+    cv.style.transition = 'none'; cv.style.transform = 'translateY(-102%)';
+    cv.style.filter = 'brightness(1.5) contrast(.25) saturate(0) blur(1.5px)';
+    st.textContent = 'printing your strip…';
+    await renderStrip(cv, { scale: .5 });
+    if (run !== printRun) return;
+    m.classList.add('busy');
+    await wait(500);
+    const steps = 8;
+    for (let k = 1; k <= steps; k++) {
+      if (run !== printRun) return;
+      m.classList.add('shake'); motor(.34);
+      cv.style.transition = 'transform .34s linear';
+      cv.style.transform = `translateY(${-102 + 102 * k / steps}%)`;
+      await wait(340); m.classList.remove('shake'); await wait(k === steps ? 0 : 160);
+    }
+    cv.style.transition = 'transform .45s cubic-bezier(.3,1.6,.5,1)'; cv.style.transform = 'translateY(0) rotate(1.2deg)';
+    noiseBurst(.05, .5);
+    m.classList.remove('busy');
+    st.textContent = 'developing… tap the strip to shake it';
+    await new Promise(r => {
+      requestAnimationFrame(() => { cv.style.transition = 'transform .45s, filter 5s ease-in'; cv.style.filter = 'none'; });
+      const t = setTimeout(r, 5000);
+      developFast = () => { clearTimeout(t); cv.style.transition = 'transform .45s, filter 1.2s ease-in'; cv.style.filter = 'none'; setTimeout(r, 1200); };
+    });
+    developFast = null;
+    if (run !== printRun) return;
+    ding(); st.textContent = 'fresh from the booth!';
+    res.classList.remove('printing');
+  }
+  $('#finalStrip').addEventListener('click', () => {
+    const cv = $('#finalStrip');
+    cv.animate([{ transform: 'translateY(0) rotate(1.2deg)' }, { transform: 'translateY(0) rotate(-4deg)' }, { transform: 'translateY(0) rotate(5deg)' }, { transform: 'translateY(0) rotate(1.2deg)' }], { duration: 380 });
+    if (developFast) developFast();
+  });
+  // Mobile-friendly save: on iPhone/iPad the share sheet offers "Save Image" (straight to Photos);
+  // the blob is pre-rendered when the result screen opens so the tap still counts as a user gesture.
+  let stripCache = null;
+  function prepStrip() { stripCache = (async () => { const c = document.createElement('canvas'); await renderStrip(c, { scale: 1 }); return new Promise(r => c.toBlob(r, 'image/png')); })(); return stripCache; }
+  window.addEventListener('snapstrip:result', prepStrip);
+  const isTouch = matchMedia('(pointer: coarse)').matches || /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  async function exportPNG() {
+    const name = `snapstrip-${state.frame.id}-${state.layout}-${Date.now()}.png`;
+    const blob = await (stripCache || prepStrip());
+    const file = new File([blob], name, { type: 'image/png' });
+    if (isTouch && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: 'My Snapstrip' }); toast('saved ✦ good things are coming'); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.download = name; a.href = url;
+    if (isTouch && !('download' in a)) window.open(url, '_blank'); else a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    toast(isTouch ? 'saved ✦ check Downloads, or long-press the strip to save' : 'saved ✦ good things are coming');
+  }
+  // Used by telegram/telegram.js to get the finished strip as a PNG blob.
+  window.snapstrip = { stripBlob: async () => { const c = document.createElement('canvas'); await renderStrip(c, { scale: 1 }); return new Promise(r => c.toBlob(r, 'image/png')); } };
+  $('#downloadBtn').addEventListener('click', exportPNG);
+  $('#againBtn').addEventListener('click', () => { state.shots = []; go('booth'); });
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2400); }
+
+  // ================= boot =================
+  async function boot() {
+    try { await Promise.race([Promise.all([document.fonts.load(SERIF), document.fonts.load(TYPE), document.fonts.load(HAND), document.fonts.load('900 30px "Playfair Display"'), document.fonts.load('700 26px "DM Sans"')]), wait(2500)]); } catch (_) {}
+    renderStrip($('#sampleStrip'), { frame: FRAMES[0], filter: FILTERS[0], shots: [], layout: '3x1', scale: .34, caption: 'best day ever' });
+  }
+  go('landing');
+  boot();
+})();
+</script>
+
+<!-- Telegram delivery (MVP). WARNING: anyone who opens the page source can see this
+     token and control the bot. Fine for a local demo; move it to a server before going public. -->
+<script>
+  window.SNAPSTRIP_TELEGRAM = {
+    botToken: '',
+    botUsername: '' // optional, e.g. 'snapstrip_bot'; looked up automatically if empty
+  };
+</script>
+<script src="telegram/qrcode.js"></script>
+<script src="telegram/telegram.js"></script>
+</body>
+</html>
